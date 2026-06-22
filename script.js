@@ -170,6 +170,8 @@ async function fetchUnsplashWallpaper() {
                 imageLink.href = photoUrl;
                 currentUnsplashPhotoId  = data.id;
                 currentUnsplashPhotoUrl = photoUrl;
+
+                imageLink.classList.remove('heart-liked');
             }
         };
         img.onerror = () => {
@@ -233,65 +235,83 @@ function initWallpaper() {
 // ========================================
 
 // Default website shortcuts data - categorized
+// ========================================
+// DEFAULT DATA
+// ========================================
+
+// Default website shortcuts data - categorized for a generic first collection
 const defaultCategories = [
     {
-        id: 'productivity',
-        name: '🎯 Work & Productivity',
-        icon: '🎯',
-        websites: [
-            { name: 'Notion', url: 'https://www.notion.so', domain: 'notion.so', customIcon: 'https://www.notion.so/images/favicon.ico' },
-            { name: 'Trello', url: 'https://trello.com', domain: 'trello.com', customIcon: 'https://trello.com/favicon.ico' },
-            { name: 'Gmail', url: 'https://mail.google.com', domain: 'mail.google.com', customIcon: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico' },
-            { name: 'Google Drive', url: 'https://drive.google.com', domain: 'drive.google.com', customIcon: 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png' }
-        ]
-    },
-    {
-        id: 'development',
-        name: '💻 Development & Tech',
-        icon: '💻',
-        websites: [
-            { name: 'GitHub', url: 'https://github.com', domain: 'github.com', customIcon: 'https://github.githubassets.com/favicons/favicon.png' },
-            { name: 'Stack Overflow', url: 'https://stackoverflow.com', domain: 'stackoverflow.com', customIcon: 'https://cdn.sstatic.net/Sites/stackoverflow/Img/favicon.ico' },
-            { name: 'Figma', url: 'https://www.figma.com', domain: 'figma.com', customIcon: 'https://static.figma.com/app/icon/1/favicon.png' },
-            { name: 'ChatGPT', url: 'https://chat.openai.com', domain: 'openai.com', customIcon: 'https://cdn.oaistatic.com/assets/favicon-o20kmmos.svg' }
-        ]
-    },
-    {
         id: 'social',
-        name: '🌐 Social & Media',
+        name: '🌐 Social Media',
         icon: '🌐',
         websites: [
-            { name: 'X (Twitter)', url: 'https://twitter.com', domain: 'twitter.com', customIcon: 'https://abs.twimg.com/favicons/twitter.3.ico' },
-            { name: 'Instagram', url: 'https://www.instagram.com', domain: 'instagram.com', customIcon: 'https://static.cdninstagram.com/rsrc.php/v3/yt/r/30PrGfR3xhB.png' },
-            { name: 'Reddit', url: 'https://www.reddit.com', domain: 'reddit.com', customIcon: 'https://www.redditstatic.com/desktop2x/img/favicon/favicon-32x32.png' },
-            { name: 'LinkedIn', url: 'https://www.linkedin.com', domain: 'linkedin.com', customIcon: 'https://static.licdn.com/sc/h/al2o9zrvru7aqj8e1x2rzsrca' },
-            { name: 'Discord', url: 'https://discord.com', domain: 'discord.com', customIcon: 'https://discord.com/assets/f9bb9c4af2b9c32a2c5ee0014661546d.png' },
-            { name: 'Medium', url: 'https://medium.com', domain: 'medium.com', customIcon: 'https://medium.com/favicon.ico' }
+            { name: 'X (Twitter)', url: 'https://twitter.com', domain: 'twitter.com' },
+            { name: 'Instagram', url: 'https://www.instagram.com', domain: 'instagram.com' },
+            { name: 'Reddit', url: 'https://www.reddit.com', domain: 'reddit.com' },
+            { name: 'LinkedIn', url: 'https://www.linkedin.com', domain: 'linkedin.com' }
+        ]
+    },
+    {
+        id: 'productivity',
+        name: '🎯 Productivity',
+        icon: '🎯',
+        websites: [
+            { name: 'Notion', url: 'https://www.notion.so', domain: 'notion.so' },
+            { name: 'Gmail', url: 'https://mail.google.com', domain: 'mail.google.com' },
+            { name: 'Google Drive', url: 'https://drive.google.com', domain: 'drive.google.com' },
+            { name: 'Trello', url: 'https://trello.com', domain: 'trello.com' }
+        ]
+    },
+    {
+        id: 'ai',
+        name: '🤖 Artificial Intelligence',
+        icon: '🤖',
+        websites: [
+            { name: 'ChatGPT', url: 'https://chat.openai.com', domain: 'openai.com' },
+            { name: 'Perplexity', url: 'https://www.perplexity.ai', domain: 'perplexity.ai' },
+            { name: 'Claude AI', url: 'https://claude.ai', domain: 'claude.ai' }
+        ]
+    },
+    {
+        id: 'sports',
+        name: '⚽ Sports',
+        icon: '⚽',
+        websites: [
+            { name: 'ESPN', url: 'https://www.espn.com', domain: 'espn.com' },
+            { name: 'ESPNcricinfo', url: 'https://www.espncricinfo.com', domain: 'espncricinfo.com' },
+            { name: 'Sky Sports', url: 'https://www.skysports.com', domain: 'skysports.com' }
+        ]
+    },
+    {
+        id: 'news',
+        name: '📰 News & Media',
+        icon: '📰',
+        websites: [
+            { name: 'BBC News', url: 'https://www.bbc.com/news', domain: 'bbc.com' },
+            { name: 'Reuters', url: 'https://www.reuters.com', domain: 'reuters.com' },
+            { name: 'The New York Times', url: 'https://www.nytimes.com', domain: 'nytimes.com' }
         ]
     },
     {
         id: 'entertainment',
-        name: '🎮 Entertainment & Gaming',
+        name: '🎬 Entertainment',
+        icon: '🎬',
+        websites: [
+            { name: 'YouTube', url: 'https://www.youtube.com', domain: 'youtube.com' },
+            { name: 'Spotify', url: 'https://www.spotify.com', domain: 'spotify.com' },
+            { name: 'Netflix', url: 'https://www.netflix.com', domain: 'netflix.com' },
+            { name: 'Twitch', url: 'https://www.twitch.tv', domain: 'twitch.tv' }
+        ]
+    },
+    {
+        id: 'games',
+        name: '🎮 Games',
         icon: '🎮',
         websites: [
             { name: 'Chess.com', url: 'https://www.chess.com', domain: 'chess.com' },
             { name: 'Wordle', url: 'https://www.nytimes.com/games/wordle', domain: 'nytimes.com' },
-            { name: 'Skribbl', url: 'https://skribbl.io', domain: 'skribbl.io' },
-            { name: 'Spotify', url: 'https://www.spotify.com', domain: 'spotify.com', customIcon: 'https://www.spotify.com/favicon.ico' },
-            { name: 'Netflix', url: 'https://www.netflix.com', domain: 'netflix.com', customIcon: 'https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.ico' },
-            { name: 'Twitch', url: 'https://www.twitch.tv', domain: 'twitch.tv', customIcon: 'https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png' }
-        ]
-    },
-    {
-        id: 'knowledge',
-        name: '📚 Search & Knowledge',
-        icon: '📚',
-        websites: [
-            { name: 'Google', url: 'https://www.google.com', domain: 'google.com', customIcon: 'https://www.google.com/favicon.ico' },
-            { name: 'YouTube', url: 'https://www.youtube.com', domain: 'youtube.com', customIcon: 'https://www.youtube.com/s/desktop/d743f786/img/favicon_144x144.png' },
-            { name: 'Wikipedia', url: 'https://www.wikipedia.org', domain: 'wikipedia.org', customIcon: 'https://www.wikipedia.org/static/favicon/wikipedia.ico' },
-            { name: 'Amazon', url: 'https://www.amazon.com', domain: 'amazon.com', customIcon: 'https://www.amazon.com/favicon.ico' },
-            { name: 'Mega', url: 'https://mega.nz', domain: 'mega.nz' }
+            { name: 'Skribbl', url: 'https://skribbl.io', domain: 'skribbl.io' }
         ]
     }
 ];
@@ -406,33 +426,32 @@ function migrateToCategories(oldWebsites) {
     // Start with default categories
     categories = JSON.parse(JSON.stringify(defaultCategories));
     
-    // Mapping of domains to category IDs for smart categorization
+
+// Mapping of domains to category IDs for smart categorization
     const categoryMapping = {
-        'notion.so': 'productivity',
-        'trello.com': 'productivity',
-        'mail.google.com': 'productivity',
-        'drive.google.com': 'productivity',
-        'github.com': 'development',
-        'stackoverflow.com': 'development',
-        'figma.com': 'development',
-        'openai.com': 'development',
         'twitter.com': 'social',
         'instagram.com': 'social',
         'reddit.com': 'social',
         'linkedin.com': 'social',
-        'discord.com': 'social',
-        'medium.com': 'social',
-        'chess.com': 'entertainment',
-        'nytimes.com': 'entertainment',
-        'skribbl.io': 'entertainment',
+        'notion.so': 'productivity',
+        'trello.com': 'productivity',
+        'mail.google.com': 'productivity',
+        'drive.google.com': 'productivity',
+        'openai.com': 'ai',
+        'perplexity.ai': 'ai',
+        'claude.ai': 'ai',
+        'espn.com': 'sports',
+        'espncricinfo.com': 'sports',
+        'skysports.com': 'sports',
+        'bbc.com': 'news',
+        'reuters.com': 'news',
+        'nytimes.com': 'news',
+        'youtube.com': 'entertainment',
         'spotify.com': 'entertainment',
         'netflix.com': 'entertainment',
         'twitch.tv': 'entertainment',
-        'google.com': 'knowledge',
-        'youtube.com': 'knowledge',
-        'wikipedia.org': 'knowledge',
-        'amazon.com': 'knowledge',
-        'mega.nz': 'knowledge'
+        'chess.com': 'games',
+        'skribbl.io': 'games'
     };
     
     // Process old websites
@@ -765,7 +784,6 @@ async function addToUnsplashCollection() {
         if (res.ok || res.status === 422) {
             // 422 = already in collection — treat as success
             imageLink?.classList.add('heart-liked');
-            setTimeout(() => imageLink?.classList.remove('heart-liked'), 2000);
             showToast('Added to your Foyer collection on Unsplash \uD83D\uDC9B');
         } else {
             throw new Error(`API error ${res.status}`);
