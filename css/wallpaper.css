@@ -352,8 +352,8 @@ body.wallpaper-active .category-section {
 .user-avatar-container {
   position: fixed;
   top: 20px;
-  right: 20px; /* Offset left of the wallpaper toggle */
-  z-index: 1001;
+  right: 20px;
+  z-index: 99990; /* Boosted to sit above all widgets and shortcuts */
 }
 
 .user-avatar-btn {
