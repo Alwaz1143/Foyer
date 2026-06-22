@@ -1,0 +1,33 @@
+# ============================================================
+# FOYER — .gitignore
+# ============================================================
+
+# ── Runtime config (contains real API keys) ──────────────────
+config.js
+
+# ── Cloudflare Worker local secrets ──────────────────────────
+cloudflare-worker/.dev.vars
+
+# ── Node / npm ───────────────────────────────────────────────
+**/node_modules/
+npm-debug.log*
+
+# ── Environment files (for reference — not auto-loaded) ──────
+.env
+.env.local
+.env.*.local
+
+# ── Editor & OS ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+*.swp
+*.swo
+
+# ── Firebase ─────────────────────────────────────────────────
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# ── Wrangler ─────────────────────────────────────────────────
+**/.wrangler/

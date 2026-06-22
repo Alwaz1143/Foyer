@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foyer — Connecting Unsplash</title>
+    <link rel="icon" type="image/png" href="https://img.icons8.com/?size=100&id=eIM3rBvyFbHA&format=png&color=000000">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/auth.css">
+    <!-- App config — must load before any Firebase/module scripts -->
+    <script src="config.js"></script>
+
+    <style>
+        .callback-card {
+            text-align: center;
+            padding: 56px 32px 48px;
+        }
+        .cb-icon {
+            font-size: 52px;
+            line-height: 1;
+            margin-bottom: 20px;
+            display: block;
+            animation: iconPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes iconPop {
+            from { opacity: 0; transform: scale(0.5); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        .cb-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+        .cb-msg {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            line-height: 1.6;
+        }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            margin: 24px auto 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="auth-bg">
+        <div class="bg-orb bg-orb-1"></div>
+        <div class="bg-orb bg-orb-2"></div>
+        <div class="bg-orb bg-orb-3"></div>
+    </div>
+
+    <div class="auth-container">
+        <div class="auth-card callback-card">
+            <span class="cb-icon" id="cbIcon">🔗</span>
+            <div class="cb-title" id="cbTitle">Connecting Unsplash…</div>
+            <div class="cb-msg"   id="cbMsg">Exchanging your authorization. Please wait.</div>
+            <div class="spinner"  id="cbSpinner"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, db, onAuthStateChanged, doc, setDoc } from './firebase-config.js';
+
+        // ── Config ─────────────────────────────────────────────────────────────
+        // Replace with your Cloudflare Worker URL after running `wrangler deploy`
+        // It will look like: https://foyer-unsplash.YOUR_NAME.workers.dev
+        const WORKER_URL = 'https://foyer-unsplash.alwaz.workers.dev';
+        const UNSPLASH_REDIRECT_URI = window.FOYER_CONFIG?.unsplash?.redirectUri || `${window.location.origin}/unsplash-callback.html`;
+
+        // ── Read OAuth params ─────────────────────────────────────────────────
+        const params = new URLSearchParams(window.location.search);
+        const code   = params.get('code');
+        const error  = params.get('error');
+
+        const icon    = document.getElementById('cbIcon');
+        const title   = document.getElementById('cbTitle');
+        const msg     = document.getElementById('cbMsg');
+        const spinner = document.getElementById('cbSpinner');
+
+        // ── Outcome helpers ───────────────────────────────────────────────────
+        function showSuccess(username) {
+            spinner.style.display = 'none';
+            icon.textContent  = '✅';
+            title.textContent = `Connected as @${username}`;
+            msg.textContent   = 'Your Unsplash account is linked to Foyer. Returning to homepage…';
+            setTimeout(() => window.location.replace('index.html'), 2200);
+        }
+
+        function showError(message) {
+            spinner.style.display = 'none';
+            icon.textContent  = '❌';
+            title.textContent = 'Connection Failed';
+            msg.textContent   = message + '\n\nReturning to homepage…';
+            setTimeout(() => window.location.replace('index.html'), 3500);
+        }
+
+        // ── Main flow ─────────────────────────────────────────────────────────
+        if (error) {
+            showError(`Unsplash denied access: ${error}`);
+
+        } else if (!code) {
+            showError('No authorization code was received. Please try again.');
+
+        } else {
+            // Wait for Firebase Auth to confirm user identity
+            onAuthStateChanged(auth, async (user) => {
+                if (!user) {
+                    showError('You must be signed in to Foyer to connect Unsplash.');
+                    setTimeout(() => window.location.replace('login.html'), 2000);
+                    return;
+                }
+
+                try {
+                    // ── 1. Exchange code for token via Cloudflare Worker ──────
+                    const redirectUri = UNSPLASH_REDIRECT_URI;
+
+                    const workerRes = await fetch(WORKER_URL, {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body:    JSON.stringify({ code, redirect_uri: redirectUri })
+                    });
+
+                    const workerData = await workerRes.json();
+
+                    if (!workerRes.ok) {
+                        throw new Error(workerData.error || `Worker error ${workerRes.status}`);
+                    }
+
+                    const { access_token, username } = workerData;
+
+                    // ── 2. Store access token in Firestore ────────────────────
+                    // Security rules ensure only the signed-in user can write here.
+                    await setDoc(
+                        doc(db, 'users', user.uid),
+                        {
+                            unsplash: {
+                                accessToken:        access_token,
+                                username:           username,
+                                connectedAt:        new Date().toISOString(),
+                                foyerCollectionId:  null  // Set on first ♥ click
+                            }
+                        },
+                        { merge: true }
+                    );
+
+                    showSuccess(username);
+
+                } catch (err) {
+                    console.error('Foyer: Unsplash connection failed:', err);
+                    showError(`Connection error: ${err.message}`);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

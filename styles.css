@@ -1,0 +1,30 @@
+/* ============================================
+   Main CSS - Imports all modular styles
+   ============================================
+   
+   File Structure:
+   ├── variables.css   - CSS custom properties & reset
+   ├── base.css        - Body & container styles
+   ├── wallpaper.css   - Wallpaper system
+   ├── widgets.css     - Search widgets
+   ├── categories.css  - Category sections & grids
+   ├── shortcuts.css   - Shortcut items & icons
+   ├── buttons.css     - All button styles
+   ├── modals.css      - Modal dialogs
+   ├── animations.css  - Keyframe animations
+   ├── accessibility.css - Focus & a11y styles
+   └── responsive.css  - Media queries
+   
+============================================ */
+
+@import url('css/variables.css');
+@import url('css/base.css');
+@import url('css/animations.css');
+@import url('css/wallpaper.css');
+@import url('css/widgets.css');
+@import url('css/categories.css');
+@import url('css/shortcuts.css');
+@import url('css/buttons.css');
+@import url('css/modals.css');
+@import url('css/accessibility.css');
+@import url('css/responsive.css');
