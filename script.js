@@ -21,9 +21,9 @@ const GIST_CONFIG = {
 // Tracks which IDs have been written to Firestore so we can
 // efficiently delete removed categories/websites on next sync.
 let knownFirestoreCategoryIds = new Set();
-let knownFirestoreWebsiteIds  = new Map(); // categoryId -> Set<websiteId>
-let firestoreSyncTimeout      = null;
-let isFirstLoad               = true;
+let knownFirestoreWebsiteIds = new Map(); // categoryId -> Set<websiteId>
+let firestoreSyncTimeout = null;
+let isFirstLoad = true;
 
 // ========================================
 // UNSPLASH WALLPAPER CONFIGURATION
@@ -43,17 +43,17 @@ const UNSPLASH_CONFIG = {
 // Toggle shortcut menu dropdown
 function toggleShortcutMenu(shortcutElement, menuDropdown, menuBtn) {
     const isOpen = menuDropdown.classList.contains('show');
-    
+
     // Close all other menus first
     closeAllMenus();
-    
+
     // Toggle this menu
     if (!isOpen) {
         // Position the dropdown relative to the menu button
         const btnRect = menuBtn.getBoundingClientRect();
         menuDropdown.style.top = (btnRect.bottom + 4) + 'px';
         menuDropdown.style.left = (btnRect.right - menuDropdown.offsetWidth) + 'px';
-        
+
         // Ensure it doesn't go off-screen
         const dropdownRect = menuDropdown.getBoundingClientRect();
         if (dropdownRect.left < 10) {
@@ -62,7 +62,7 @@ function toggleShortcutMenu(shortcutElement, menuDropdown, menuBtn) {
         if (dropdownRect.right > window.innerWidth - 10) {
             menuDropdown.style.left = (window.innerWidth - menuDropdown.offsetWidth - 10) + 'px';
         }
-        
+
         menuDropdown.classList.add('show');
         shortcutElement.classList.add('menu-open');
     }
@@ -91,28 +91,28 @@ document.addEventListener('click', (e) => {
 
 let wallpaperEnabled = localStorage.getItem('wallpaperEnabled') !== 'false'; // Enabled by default
 let lastWallpaperKeyword = localStorage.getItem('lastWallpaperKeyword') || '';
-let currentUnsplashPhotoId  = null;  // ID of the currently displayed Unsplash photo
+let currentUnsplashPhotoId = null;  // ID of the currently displayed Unsplash photo
 let currentUnsplashPhotoUrl = null;  // Unsplash page URL for the current photo
 
 // Get a random keyword different from the last one
 function getRandomWallpaperKeyword() {
     const keywords = UNSPLASH_CONFIG.query.split(',').map(k => k.trim()).filter(k => k.length > 0);
-    
+
     if (keywords.length <= 1) {
         return keywords[0] || 'nature';
     }
-    
+
     // Filter out the last used keyword
     const availableKeywords = keywords.filter(k => k.toLowerCase() !== lastWallpaperKeyword.toLowerCase());
-    
+
     // Pick a random keyword from available ones
     const randomIndex = Math.floor(Math.random() * availableKeywords.length);
     const selectedKeyword = availableKeywords[randomIndex];
-    
+
     // Store the selected keyword
     lastWallpaperKeyword = selectedKeyword;
     localStorage.setItem('lastWallpaperKeyword', selectedKeyword);
-    
+
     return selectedKeyword;
 }
 
@@ -131,7 +131,7 @@ async function fetchUnsplashWallpaper() {
 
     // Get a random keyword different from the last one
     const selectedKeyword = getRandomWallpaperKeyword();
-    
+
     // Detect screen orientation - portrait for mobile, landscape for desktop
     const orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
 
@@ -150,14 +150,14 @@ async function fetchUnsplashWallpaper() {
         }
 
         const data = await response.json();
-        
+
         // Preload the image
         const img = new Image();
         img.onload = () => {
             wallpaperBg.style.backgroundImage = `url(${data.urls.regular})`;
             wallpaperBg.classList.add('loaded');
             document.body.classList.add('wallpaper-active');
-            
+
             // Show photographer credit (required by Unsplash)
             if (photographerLink && photoCredit) {
                 photographerLink.textContent = data.user.name;
@@ -168,7 +168,7 @@ async function fetchUnsplashWallpaper() {
             if (imageLink) {
                 const photoUrl = `${data.links.html}?utm_source=foyer&utm_medium=referral`;
                 imageLink.href = photoUrl;
-                currentUnsplashPhotoId  = data.id;
+                currentUnsplashPhotoId = data.id;
                 currentUnsplashPhotoUrl = photoUrl;
 
                 imageLink.classList.remove('heart-liked');
@@ -187,7 +187,7 @@ async function fetchUnsplashWallpaper() {
 function disableWallpaper() {
     const wallpaperBg = document.getElementById('wallpaperBackground');
     const photoCredit = document.getElementById('photoCredit');
-    
+
     if (wallpaperBg) {
         wallpaperBg.classList.remove('loaded');
         wallpaperBg.style.backgroundImage = '';
@@ -215,7 +215,7 @@ function toggleWallpaper() {
 
 function initWallpaper() {
     const wallpaperToggle = document.getElementById('wallpaperToggle');
-    
+
     // Setup toggle button
     if (wallpaperToggle) {
         wallpaperToggle.addEventListener('click', toggleWallpaper);
@@ -223,7 +223,7 @@ function initWallpaper() {
             wallpaperToggle.classList.add('disabled');
         }
     }
-    
+
     // Fetch wallpaper if enabled
     if (wallpaperEnabled) {
         fetchUnsplashWallpaper();
@@ -361,7 +361,7 @@ async function loadCategoriesFromFirestore() {
 
         // Build categories from Firestore docs (sort by orderIndex in memory)
         knownFirestoreCategoryIds = new Set();
-        knownFirestoreWebsiteIds  = new Map();
+        knownFirestoreWebsiteIds = new Map();
         categories = [];
 
         const sortedCatDocs = catsSnap.docs.sort((a, b) =>
@@ -422,12 +422,12 @@ function saveCategories() {
 // Migration function for existing users
 function migrateToCategories(oldWebsites) {
     console.log('Migrating from flat structure to categories...');
-    
+
     // Start with default categories
     categories = JSON.parse(JSON.stringify(defaultCategories));
-    
 
-// Mapping of domains to category IDs for smart categorization
+
+    // Mapping of domains to category IDs for smart categorization
     const categoryMapping = {
         'twitter.com': 'social',
         'instagram.com': 'social',
@@ -453,13 +453,13 @@ function migrateToCategories(oldWebsites) {
         'chess.com': 'games',
         'skribbl.io': 'games'
     };
-    
+
     // Process old websites
     oldWebsites.forEach(site => {
         // Find matching category
         const categoryId = categoryMapping[site.domain] || 'productivity'; // Default to productivity
         const category = categories.find(cat => cat.id === categoryId);
-        
+
         if (category) {
             // Check if site already exists (avoid duplicates)
             const exists = category.websites.some(w => w.domain === site.domain);
@@ -468,7 +468,7 @@ function migrateToCategories(oldWebsites) {
             }
         }
     });
-    
+
     saveCategories();
     console.log('Migration complete!');
 }
@@ -495,10 +495,10 @@ function getRootDomain(input) {
             // Just a hostname
             hostname = input;
         }
-        
+
         // Remove www. prefix if present
         hostname = hostname.replace(/^www\./, '');
-        
+
         // Extract root domain (e.g., mail.google.com -> google.com)
         const parts = hostname.split('.');
         if (parts.length > 2) {
@@ -522,17 +522,17 @@ function getCategoryDisplayName(category) {
     if (!category) return '';
     let name = (category.name || '').trim();
     const icon = (category.icon || '').trim();
-    
+
     if (icon && name) {
         // Remove icon from anywhere in the name string (start, middle, or end)
         // Escape special regex characters in the icon
         const escapedIcon = icon.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         name = name.replace(new RegExp(escapedIcon, 'g'), '').trim();
-        
+
         // Also remove common separators that might be left over
         name = name.replace(/^[-\s]+|[-\s]+$/g, '').trim();
     }
-    
+
     return name || category.name || '';
 }
 
@@ -610,24 +610,24 @@ async function syncToFirestore() {
             if (!cat.id) cat.id = generateSiteId();
 
             batch.set(doc(db, 'users', uid, 'categories', cat.id), {
-                name:       cat.name,
-                icon:       cat.icon || '',
+                name: cat.name,
+                icon: cat.icon || '',
                 orderIndex: catIndex
             });
 
             const currentSiteIds = new Set();
-            const knownSiteIds   = knownFirestoreWebsiteIds.get(cat.id) || new Set();
+            const knownSiteIds = knownFirestoreWebsiteIds.get(cat.id) || new Set();
 
             cat.websites.forEach((site, siteIndex) => {
                 if (!site.id) site.id = generateSiteId();
                 currentSiteIds.add(site.id);
 
                 batch.set(doc(db, 'users', uid, 'categories', cat.id, 'websites', site.id), {
-                    name:        site.name,
-                    url:         site.url,
-                    domain:      site.domain,
-                    customIcon:  site.customIcon || '',
-                    orderIndex:  siteIndex
+                    name: site.name,
+                    url: site.url,
+                    domain: site.domain,
+                    customIcon: site.customIcon || '',
+                    orderIndex: siteIndex
                 });
             });
 
@@ -643,13 +643,13 @@ async function syncToFirestore() {
 
         // Write user settings alongside categories (single batch)
         batch.set(doc(db, 'users', uid), {
-            email:       window.currentUser.email       || '',
+            email: window.currentUser.email || '',
             displayName: window.currentUser.displayName || '',
-            photoURL:    window.currentUser.photoURL    || '',
+            photoURL: window.currentUser.photoURL || '',
             settings: {
-                wallpaperEnabled:       localStorage.getItem('wallpaperEnabled') !== 'false',
-                selectedSearchEngine:   localStorage.getItem('selectedSearchEngine') || 'google',
-                lastWallpaperKeyword:   localStorage.getItem('lastWallpaperKeyword') || ''
+                wallpaperEnabled: localStorage.getItem('wallpaperEnabled') !== 'false',
+                selectedSearchEngine: localStorage.getItem('selectedSearchEngine') || 'google',
+                lastWallpaperKeyword: localStorage.getItem('lastWallpaperKeyword') || ''
             }
         }, { merge: true });
 
@@ -691,16 +691,16 @@ async function loadUserSettingsFromFirestore() {
 }
 
 // No-op stubs (kept for backwards-compat with any callers in legacy code)
-function scheduleAutoSync() {}
-function showSyncStatus() {}
+function scheduleAutoSync() { }
+function showSyncStatus() { }
 
 // ========================================
 // UNSPLASH COLLECTION INTEGRATION
 // ========================================
 
-let unsplashAccessToken     = null;
-let foyerCollectionId       = null;
-let unsplashConnected       = false;
+let unsplashAccessToken = null;
+let foyerCollectionId = null;
+let unsplashConnected = false;
 
 // Load Unsplash state from Firestore on startup
 async function loadUnsplashState() {
@@ -710,8 +710,8 @@ async function loadUnsplashState() {
         const snap = await getDoc(doc(db, 'users', window.currentUser.uid));
         if (snap.exists() && snap.data().unsplash?.accessToken) {
             unsplashAccessToken = snap.data().unsplash.accessToken;
-            foyerCollectionId   = snap.data().unsplash.foyerCollectionId || null;
-            unsplashConnected   = true;
+            foyerCollectionId = snap.data().unsplash.foyerCollectionId || null;
+            unsplashConnected = true;
         }
     } catch (e) {
         console.warn('Foyer: Could not load Unsplash state:', e);
@@ -720,10 +720,10 @@ async function loadUnsplashState() {
 
 // Wire up the ♥ button with the new behavior
 function setupHeartButton() {
-    const imageLink    = document.getElementById('imageLink');
-    const popup        = document.getElementById('unsplashPopup');
+    const imageLink = document.getElementById('imageLink');
+    const popup = document.getElementById('unsplashPopup');
     const connectPopupBtn = document.getElementById('connectUnsplashPopupBtn');
-    const openBtn      = document.getElementById('openInUnsplashBtn');
+    const openBtn = document.getElementById('openInUnsplashBtn');
 
     if (!imageLink) return;
 
@@ -773,10 +773,10 @@ async function addToUnsplashCollection() {
 
         // Add photo to collection
         const res = await fetch(`https://api.unsplash.com/collections/${foyerCollectionId}/add`, {
-            method:  'POST',
+            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${unsplashAccessToken}`,
-                'Content-Type':  'application/json'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ photo_id: currentUnsplashPhotoId })
         });
@@ -800,15 +800,15 @@ async function addToUnsplashCollection() {
 async function createFoyerCollection() {
     try {
         const res = await fetch('https://api.unsplash.com/collections', {
-            method:  'POST',
+            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${unsplashAccessToken}`,
-                'Content-Type':  'application/json'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                title:       'Foyer',
+                title: 'Foyer',
                 description: 'Photos I loved while using Foyer — my personal browser homepage',
-                private:     false
+                private: false
             })
         });
 
@@ -883,53 +883,53 @@ function initElements() {
 // Render shortcuts grid with categories
 function renderShortcuts() {
     const grid = elements.grid || document.getElementById('shortcutsGrid');
-    
+
     // Clean up any existing dropdown menus from body
     document.querySelectorAll('.shortcut-menu-dropdown').forEach(dropdown => {
         dropdown.remove();
     });
-    
+
     grid.innerHTML = '';
-    
+
     categories.forEach((category, categoryIndex) => {
         // Create category section
         const categorySection = document.createElement('div');
         categorySection.className = 'category-section';
         categorySection.setAttribute('data-category-id', category.id);
-        
+
         // Create category header (draggable for section reordering)
         const categoryHeader = document.createElement('div');
         categoryHeader.className = 'category-header';
         categoryHeader.draggable = true;
         categoryHeader.setAttribute('data-section-index', categoryIndex);
-        
+
         // Add drag handle icon
         const dragHandle = document.createElement('span');
         dragHandle.className = 'section-drag-handle';
         dragHandle.innerHTML = '<i class="fas fa-grip-vertical"></i>';
         dragHandle.title = 'Drag to reorder section';
-        
+
         const headerContent = document.createElement('div');
         headerContent.className = 'category-header-content';
-        
+
         const categoryIcon = document.createElement('span');
         categoryIcon.className = 'category-icon';
         categoryIcon.textContent = (category.icon && category.icon.trim()) || '📁';
-        
+
         const categoryTitle = document.createElement('h3');
         categoryTitle.className = 'category-title';
         const displayName = getCategoryDisplayName(category) || category.name || 'Untitled Section';
         categoryTitle.textContent = displayName;
-        
+
         headerContent.appendChild(categoryIcon);
         headerContent.appendChild(categoryTitle);
-        
+
         categoryHeader.appendChild(dragHandle);
-        
+
         const countBadge = document.createElement('span');
         countBadge.className = 'category-count';
         countBadge.textContent = category.websites.length;
-        
+
         const editSectionBtn = document.createElement('button');
         editSectionBtn.className = 'section-edit-btn';
         editSectionBtn.type = 'button';
@@ -939,97 +939,97 @@ function renderShortcuts() {
             e.stopPropagation();
             openSectionModal('edit', categoryIndex);
         });
-        
+
         categoryHeader.appendChild(headerContent);
         categoryHeader.appendChild(countBadge);
         categoryHeader.appendChild(editSectionBtn);
-        
+
         // Add section drag event listeners
         categoryHeader.addEventListener('dragstart', handleSectionDragStart);
         categoryHeader.addEventListener('dragend', handleSectionDragEnd);
-        
+
         // Create category grid (always visible)
         const categoryGrid = document.createElement('div');
         categoryGrid.className = 'category-grid';
         categoryGrid.setAttribute('data-category-index', categoryIndex);
-        
+
         // Add grid-level drag-over handlers
-        categoryGrid.addEventListener('dragenter', function(e) {
+        categoryGrid.addEventListener('dragenter', function (e) {
             if (e.target === this || this.contains(e.target)) {
                 this.classList.add('drag-over');
             }
         });
-        
-        categoryGrid.addEventListener('dragleave', function(e) {
+
+        categoryGrid.addEventListener('dragleave', function (e) {
             if (e.target === this || !this.contains(e.relatedTarget)) {
                 this.classList.remove('drag-over');
             }
         });
-        
+
         categoryGrid.addEventListener('dragover', handleDragOver);
-        
-        categoryGrid.addEventListener('drop', function(e) {
+
+        categoryGrid.addEventListener('drop', function (e) {
             if (e.stopPropagation) {
                 e.stopPropagation();
             }
             e.preventDefault();
-            
+
             this.classList.remove('drag-over');
-            
+
             if (!draggedElement) return false;
-            
+
             const dropCategoryIndex = parseInt(this.getAttribute('data-category-index'));
             const draggedSite = categories[draggedCategoryIndex].websites[draggedItemIndex];
-            
+
             // Calculate drop position (end of category if dropping on empty space)
             let dropItemIndex = categories[dropCategoryIndex].websites.length;
-            
+
             // If placeholder exists, use its position
             if (placeholder && placeholder.parentNode === this) {
                 const itemsBefore = Array.from(this.children)
                     .slice(0, Array.from(this.children).indexOf(placeholder))
-                    .filter(child => 
-                        child.classList.contains('shortcut-item') && 
+                    .filter(child =>
+                        child.classList.contains('shortcut-item') &&
                         !child.classList.contains('add-site-btn') &&
                         !child.classList.contains('placeholder')
                     ).length;
                 dropItemIndex = itemsBefore;
             }
-            
+
             // Move the website
             categories[draggedCategoryIndex].websites.splice(draggedItemIndex, 1);
-            
+
             // Adjust if moving within same category
             if (draggedCategoryIndex === dropCategoryIndex && draggedItemIndex < dropItemIndex) {
                 dropItemIndex--;
             }
-            
+
             categories[dropCategoryIndex].websites.splice(dropItemIndex, 0, draggedSite);
-            
+
             saveCategories();
-            
+
             // Update affected grids
             const affectedCategories = [draggedCategoryIndex];
             if (draggedCategoryIndex !== dropCategoryIndex) {
                 affectedCategories.push(dropCategoryIndex);
             }
-            
+
             affectedCategories.forEach(catIndex => updateCategoryGrid(catIndex));
-            
+
             return false;
         });
-        
+
         // Render all websites (no conditional rendering)
         category.websites.forEach((site, itemIndex) => {
             const shortcut = createShortcutElement(site, categoryIndex, itemIndex);
             categoryGrid.appendChild(shortcut);
         });
-        
+
         categorySection.appendChild(categoryHeader);
         categorySection.appendChild(categoryGrid);
         grid.appendChild(categorySection);
     });
-    
+
     // Add section drag-over and drop handlers to the grid container
     grid.addEventListener('dragover', handleSectionDragOver);
     grid.addEventListener('drop', handleSectionDrop);
@@ -1039,26 +1039,26 @@ function renderShortcuts() {
 function updateCategoryGrid(categoryIndex) {
     const category = categories[categoryIndex];
     const categoryGrid = document.querySelector(`.category-grid[data-category-index="${categoryIndex}"]`);
-    
+
     if (!categoryGrid) return;
-    
+
     // Remove placeholder if it belongs to this grid
     if (placeholder && placeholder.parentNode === categoryGrid) {
         placeholder.parentNode.removeChild(placeholder);
     }
-    
+
     // Remove existing shortcuts (keep add button if it's the last grid)
     const existingShortcuts = Array.from(categoryGrid.children).filter(
         child => child.classList.contains('shortcut-item') && !child.classList.contains('add-site-btn')
     );
     existingShortcuts.forEach(item => item.remove());
-    
+
     // Re-create shortcuts with fresh data
     category.websites.forEach((site, itemIndex) => {
         const shortcut = createShortcutElement(site, categoryIndex, itemIndex);
         categoryGrid.appendChild(shortcut);
     });
-    
+
     // Update category count
     updateCategoryCount(categoryIndex);
 }
@@ -1075,7 +1075,7 @@ function createShortcutElement(site, categoryIndex, itemIndex) {
     const row = Math.floor(itemIndex / 4);
     const delay = (categoryIndex * 0.2) + (row * 0.06) + (column * 0.02);
     shortcut.style.animationDelay = `${delay}s`;
-    
+
     // Add drag event listeners
     shortcut.addEventListener('dragstart', handleDragStart);
     shortcut.addEventListener('dragover', handleDragOver);
@@ -1083,7 +1083,7 @@ function createShortcutElement(site, categoryIndex, itemIndex) {
     shortcut.addEventListener('dragend', handleDragEnd);
     shortcut.addEventListener('dragenter', handleDragEnter);
     shortcut.addEventListener('dragleave', handleDragLeave);
-    
+
     const link = document.createElement('a');
     link.href = site.url;
     link.target = '_self';
@@ -1095,17 +1095,17 @@ function createShortcutElement(site, categoryIndex, itemIndex) {
             e.preventDefault();
         }
     });
-    
+
     const icon = document.createElement('div');
     icon.className = 'shortcut-icon';
-    
+
     const img = document.createElement('img');
     img.src = site.customIcon || getFaviconUrl(site.domain);
     img.alt = site.name;
     img.loading = 'lazy';
     img.draggable = false;
-    
-    img.onerror = function() {
+
+    img.onerror = function () {
         if (!this.dataset.attempted) {
             this.dataset.attempted = 'true';
             this.src = `https://www.google.com/s2/favicons?domain=${site.domain}&sz=64`;
@@ -1132,17 +1132,17 @@ function createShortcutElement(site, categoryIndex, itemIndex) {
             icon.innerHTML = `<span style="font-size: 24px; font-weight: 600; color: var(--text-color);">${site.name.charAt(0).toUpperCase()}</span>`;
         }
     };
-    
+
     // Create ellipsis menu button and dropdown
     const menuBtn = document.createElement('button');
     menuBtn.className = 'shortcut-menu-btn';
     menuBtn.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
     menuBtn.setAttribute('aria-label', `Options for ${site.name}`);
     menuBtn.setAttribute('title', 'Options');
-    
+
     const menuDropdown = document.createElement('div');
     menuDropdown.className = 'shortcut-menu-dropdown';
-    
+
     const editOption = document.createElement('button');
     editOption.className = 'menu-option edit-option';
     editOption.innerHTML = '<i class="fas fa-edit"></i><span>Edit</span>';
@@ -1152,7 +1152,7 @@ function createShortcutElement(site, categoryIndex, itemIndex) {
         closeAllMenus();
         showEditSiteModal(categoryIndex, itemIndex);
     });
-    
+
     const deleteOption = document.createElement('button');
     deleteOption.className = 'menu-option delete-option';
     deleteOption.innerHTML = '<i class="fas fa-trash"></i><span>Delete</span>';
@@ -1162,31 +1162,31 @@ function createShortcutElement(site, categoryIndex, itemIndex) {
         closeAllMenus();
         deleteSite(categoryIndex, itemIndex);
     });
-    
+
     menuDropdown.appendChild(editOption);
     menuDropdown.appendChild(deleteOption);
-    
+
     menuBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         toggleShortcutMenu(shortcut, menuDropdown, menuBtn);
     });
-    
+
     icon.appendChild(img);
     link.appendChild(icon);
     shortcut.appendChild(link);
-    
+
     // Add permanent name label below icon
     const nameLabel = document.createElement('span');
     nameLabel.className = 'shortcut-name';
     nameLabel.textContent = site.name;
     nameLabel.title = site.name; // Full name on hover
     shortcut.appendChild(nameLabel);
-    
+
     shortcut.appendChild(menuBtn);
     // Append dropdown to body for proper z-index stacking
     document.body.appendChild(menuDropdown);
-    
+
     return shortcut;
 }
 
@@ -1205,52 +1205,52 @@ function updateCategoryCount(categoryIndex) {
 // Helper: Find element after which to insert (based on cursor position)
 function getDragAfterElement(container, x, y) {
     const draggableElements = [...container.querySelectorAll('.shortcut-item:not(.dragging):not(.add-site-btn):not(.placeholder)')];
-    
+
     // If grid is empty, return null to append at end
     if (draggableElements.length === 0) {
         return null;
     }
-    
+
     let closestElement = null;
     let closestOffset = Number.POSITIVE_INFINITY;
-    
+
     draggableElements.forEach(child => {
         const box = child.getBoundingClientRect();
-        
+
         // Calculate center of the element
         const centerX = box.left + box.width / 2;
         const centerY = box.top + box.height / 2;
-        
+
         // Calculate distance from cursor to center
         const offsetX = x - centerX;
         const offsetY = y - centerY;
         const distance = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
-        
+
         // If cursor is past this element (to the right or below), consider it
         const isPastElement = (y > box.top && (x > box.left + box.width || y > box.bottom));
-        
+
         if (distance < closestOffset) {
             closestOffset = distance;
             closestElement = child;
         }
     });
-    
+
     // If we found an element, check if cursor is after it
     if (closestElement) {
         const box = closestElement.getBoundingClientRect();
         const centerX = box.left + box.width / 2;
         const centerY = box.top + box.height / 2;
-        
+
         // If cursor is to the right or below the center, insert after this element
         if (x > centerX || (y > centerY && x > box.left)) {
             // Return the next sibling or null to insert at end
             const nextElement = closestElement.nextElementSibling;
             return (nextElement && !nextElement.classList.contains('add-site-btn')) ? nextElement : null;
         }
-        
+
         return closestElement;
     }
-    
+
     return null;
 }
 
@@ -1261,21 +1261,21 @@ function handleDragStart(e) {
         e.preventDefault();
         return;
     }
-    
+
     draggedElement = this;
     draggedCategoryIndex = parseInt(this.getAttribute('data-category-index'));
     draggedItemIndex = parseInt(this.getAttribute('data-item-index'));
-    
+
     this.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', this.innerHTML);
-    
+
     // Create placeholder
     placeholder = document.createElement('div');
     placeholder.className = 'shortcut-item placeholder';
     placeholder.style.width = this.offsetWidth + 'px';
     placeholder.style.height = this.offsetHeight + 'px';
-    
+
     // Slight delay for drag effect
     setTimeout(() => {
         if (draggedElement) {
@@ -1287,31 +1287,31 @@ function handleDragStart(e) {
 function handleDragOver(e) {
     // Ignore if section is being dragged
     if (draggedSectionIndex !== null) return false;
-    
+
     if (e.preventDefault) {
         e.preventDefault();
     }
     e.dataTransfer.dropEffect = 'move';
-    
+
     if (!draggedElement || !placeholder) return false;
-    
+
     // Find the closest category-grid
     const target = e.target.closest('.category-grid');
     if (!target) return false;
-    
+
     // Don't insert placeholder if hovering over the dragged element itself
     if (e.target === draggedElement || draggedElement.contains(e.target)) {
         return false;
     }
-    
+
     // Calculate where to insert placeholder
     const afterElement = getDragAfterElement(target, e.clientX, e.clientY);
-    
+
     // Remove placeholder from its current position if it exists
     if (placeholder.parentNode) {
         placeholder.parentNode.removeChild(placeholder);
     }
-    
+
     if (afterElement == null) {
         // Append at the end
         target.appendChild(placeholder);
@@ -1319,7 +1319,7 @@ function handleDragOver(e) {
         // Insert before the afterElement
         target.insertBefore(placeholder, afterElement);
     }
-    
+
     return false;
 }
 
@@ -1340,72 +1340,72 @@ function handleDrop(e) {
     if (e.stopPropagation) {
         e.stopPropagation();
     }
-    
+
     if (!draggedElement) return false;
-    
+
     const targetGrid = e.target.closest('.category-grid');
     if (!targetGrid) return false;
-    
+
     const dropCategoryIndex = parseInt(targetGrid.getAttribute('data-category-index'));
-    
+
     // Calculate drop position based on placeholder location
     let dropItemIndex = 0;
     if (placeholder && placeholder.parentNode) {
         const allItems = Array.from(placeholder.parentNode.children).filter(
-            child => child.classList.contains('shortcut-item') && 
-                    !child.classList.contains('add-site-btn') &&
-                    !child.classList.contains('placeholder')
+            child => child.classList.contains('shortcut-item') &&
+                !child.classList.contains('add-site-btn') &&
+                !child.classList.contains('placeholder')
         );
         const placeholderIndex = Array.from(placeholder.parentNode.children).indexOf(placeholder);
         const itemsBefore = Array.from(placeholder.parentNode.children)
             .slice(0, placeholderIndex)
-            .filter(child => 
-                child.classList.contains('shortcut-item') && 
+            .filter(child =>
+                child.classList.contains('shortcut-item') &&
                 !child.classList.contains('add-site-btn') &&
                 !child.classList.contains('placeholder')
             ).length;
         dropItemIndex = itemsBefore;
     }
-    
+
     // Move the website in data
     const draggedSite = categories[draggedCategoryIndex].websites[draggedItemIndex];
-    
+
     categories[draggedCategoryIndex].websites.splice(draggedItemIndex, 1);
-    
+
     // Adjust dropItemIndex if moving within same category and moving down
     if (draggedCategoryIndex === dropCategoryIndex && draggedItemIndex < dropItemIndex) {
         dropItemIndex--;
     }
-    
+
     categories[dropCategoryIndex].websites.splice(dropItemIndex, 0, draggedSite);
-    
+
     saveCategories();
-    
+
     // Only update affected grids (no full reload!)
     const affectedCategories = [draggedCategoryIndex];
     if (draggedCategoryIndex !== dropCategoryIndex) {
         affectedCategories.push(dropCategoryIndex);
     }
-    
+
     affectedCategories.forEach(catIndex => updateCategoryGrid(catIndex));
-    
+
     return false;
 }
 
 function handleDragEnd(e) {
     this.classList.remove('dragging');
     this.style.opacity = '';
-    
+
     // Remove all drag-over classes
     document.querySelectorAll('.shortcut-item, .category-grid').forEach(item => {
         item.classList.remove('drag-over');
     });
-    
+
     // Remove placeholder
     if (placeholder && placeholder.parentNode) {
         placeholder.parentNode.removeChild(placeholder);
     }
-    
+
     draggedElement = null;
     draggedCategoryIndex = null;
     draggedItemIndex = null;
@@ -1419,23 +1419,23 @@ function handleDragEnd(e) {
 function handleSectionDragStart(e) {
     // Prevent app dragging when dragging section
     if (draggedElement) return;
-    
+
     const header = this;
     const section = header.parentElement;
-    
+
     draggedSectionElement = section;
     draggedSectionIndex = parseInt(header.getAttribute('data-section-index'));
-    
+
     console.log('Starting drag of section:', draggedSectionIndex);
-    
+
     header.style.opacity = '0.4';
     section.classList.add('dragging-section');
-    
+
     // Create section placeholder
     sectionPlaceholder = document.createElement('div');
     sectionPlaceholder.className = 'section-placeholder';
     sectionPlaceholder.style.height = section.offsetHeight + 'px';
-    
+
     // Set drag image
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', header.innerHTML);
@@ -1443,13 +1443,13 @@ function handleSectionDragStart(e) {
 
 function handleSectionDragOver(e) {
     if (draggedSectionIndex === null) return;
-    
+
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    
+
     const grid = e.currentTarget;
     const afterElement = getSectionAfterElement(grid, e.clientY);
-    
+
     if (afterElement == null) {
         grid.appendChild(sectionPlaceholder);
     } else {
@@ -1459,11 +1459,11 @@ function handleSectionDragOver(e) {
 
 function getSectionAfterElement(gridContainer, y) {
     const draggableElements = [...gridContainer.querySelectorAll('.category-section:not(.dragging-section)')];
-    
+
     return draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
-        
+
         if (offset < 0 && offset > closest.offset) {
             return { offset: offset, element: child };
         } else {
@@ -1475,52 +1475,52 @@ function getSectionAfterElement(gridContainer, y) {
 function handleSectionDrop(e) {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (draggedSectionIndex === null) {
         console.log('No section being dragged');
         return;
     }
-    
+
     if (!sectionPlaceholder || !sectionPlaceholder.parentNode) {
         console.log('No placeholder found');
         return;
     }
-    
+
     // Get all sections excluding the placeholder and dragged section
     const grid = document.getElementById('shortcutsGrid');
     const allChildren = [...grid.children];
-    
+
     // Find placeholder position among all children
     const placeholderIndex = allChildren.indexOf(sectionPlaceholder);
-    
+
     if (placeholderIndex === -1) {
         console.log('Placeholder not in DOM');
         return;
     }
-    
+
     // Count only category-section elements before placeholder
     let newIndex = 0;
     for (let i = 0; i < placeholderIndex; i++) {
-        if (allChildren[i].classList.contains('category-section') && 
+        if (allChildren[i].classList.contains('category-section') &&
             !allChildren[i].classList.contains('dragging-section')) {
             newIndex++;
         }
     }
-    
+
     console.log(`Moving section from ${draggedSectionIndex} to ${newIndex}`);
-    
+
     // Only move if position changed
     if (draggedSectionIndex !== newIndex) {
         // Move category in array
         const movedCategory = categories.splice(draggedSectionIndex, 1)[0];
         categories.splice(newIndex, 0, movedCategory);
-        
+
         console.log('Categories reordered:', categories.map(c => getCategoryDisplayName(c)));
-        
+
         // Save and re-render
         saveCategories();
         renderShortcuts();
-        
+
         // Show notification
         showNotification(`Section "${getCategoryDisplayName(movedCategory)}" moved`, 'success');
     }
@@ -1529,22 +1529,22 @@ function handleSectionDrop(e) {
 function handleSectionDragEnd(e) {
     const header = this;
     const section = header.parentElement;
-    
+
     header.style.opacity = '';
     section.classList.remove('dragging-section');
-    
+
     console.log('Drag ended');
-    
+
     // Remove placeholder
     if (sectionPlaceholder && sectionPlaceholder.parentNode) {
         sectionPlaceholder.parentNode.removeChild(sectionPlaceholder);
     }
-    
+
     // Remove drag-over class from all sections
     document.querySelectorAll('.category-section').forEach(section => {
         section.classList.remove('drag-over');
     });
-    
+
     draggedSectionElement = null;
     draggedSectionIndex = null;
     sectionPlaceholder = null;
@@ -1573,13 +1573,13 @@ function showEditSiteModal(categoryIndex, itemIndex) {
     const modal = document.getElementById('editSiteModal');
     document.getElementById('editSiteName').value = site.name;
     document.getElementById('editSiteUrl').value = site.url;
-    
+
     // Set category dropdown
     const categorySelect = document.getElementById('editSiteCategory');
     if (categorySelect) {
         categorySelect.value = categories[categoryIndex].id;
     }
-    
+
     modal.style.display = 'flex';
     document.getElementById('editSiteName').focus();
 }
@@ -1595,34 +1595,34 @@ function closeEditSiteModal() {
 
 async function updateSite() {
     if (editingCategoryIndex === null || editingItemIndex === null) return;
-    
+
     const nameInput = document.getElementById('editSiteName');
     const urlInput = document.getElementById('editSiteUrl');
     const categorySelect = document.getElementById('editSiteCategory');
-    
+
     if (!nameInput || !urlInput) return;
-    
+
     const name = nameInput.value.trim();
     const url = urlInput.value.trim();
     const newCategoryId = categorySelect ? categorySelect.value : categories[editingCategoryIndex].id;
-    
+
     // Validate input length
     if (!name || name.length > 50) {
         alert('Please enter a valid site name (1-50 characters)');
         return;
     }
-    
+
     if (!url || url.length > 500) {
         alert('Please enter a valid URL (max 500 characters)');
         return;
     }
-    
+
     // Add https:// if not present
     let fullUrl = url;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
         fullUrl = 'https://' + url;
     }
-    
+
     // Validate URL
     try {
         new URL(fullUrl);
@@ -1630,30 +1630,30 @@ async function updateSite() {
         alert('Please enter a valid URL');
         return;
     }
-    
+
     // Extract clean root domain (abc.com only)
     const domain = getRootDomain(fullUrl);
-    
+
     // Show loading state
     const submitBtn = document.querySelector('#editSiteModal .btn-primary');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = 'Updating...';
     submitBtn.disabled = true;
-    
+
     // Always fetch fresh favicon to ensure icon matches the domain
     const faviconUrl = await fetchActualFavicon(fullUrl, domain);
-    
+
     const updatedSite = {
         name: name,
         url: fullUrl,
         domain: domain,
         customIcon: faviconUrl
     };
-    
+
     // Check if category changed
     const oldCategoryId = categories[editingCategoryIndex].id;
     const affectedCategories = [editingCategoryIndex];
-    
+
     if (newCategoryId !== oldCategoryId) {
         // Move to different category
         categories[editingCategoryIndex].websites.splice(editingItemIndex, 1);
@@ -1667,16 +1667,16 @@ async function updateSite() {
         // Update in same category
         categories[editingCategoryIndex].websites[editingItemIndex] = updatedSite;
     }
-    
+
     saveCategories();
-    
+
     // Only update affected grids
     affectedCategories.forEach(catIndex => updateCategoryGrid(catIndex));
-    
+
     // Reset button state
     submitBtn.textContent = originalText;
     submitBtn.disabled = false;
-    
+
     closeEditSiteModal();
 }
 
@@ -1698,30 +1698,30 @@ async function addNewSite() {
     const nameInput = document.getElementById('siteName');
     const urlInput = document.getElementById('siteUrl');
     const categorySelect = document.getElementById('siteCategory');
-    
+
     if (!nameInput || !urlInput) return;
-    
+
     const name = nameInput.value.trim();
     const url = urlInput.value.trim();
     const categoryId = categorySelect ? categorySelect.value : categories[0].id; // Default to first category
-    
+
     // Validate input length
     if (!name || name.length > 50) {
         alert('Please enter a valid site name (1-50 characters)');
         return;
     }
-    
+
     if (!url || url.length > 500) {
         alert('Please enter a valid URL (max 500 characters)');
         return;
     }
-    
+
     // Add https:// if not present
     let fullUrl = url;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
         fullUrl = 'https://' + url;
     }
-    
+
     // Validate URL
     try {
         new URL(fullUrl);
@@ -1729,41 +1729,41 @@ async function addNewSite() {
         alert('Please enter a valid URL');
         return;
     }
-    
+
     // Extract clean root domain (abc.com only)
     const domain = getRootDomain(fullUrl);
-    
+
     // Show loading state
     const submitBtn = document.querySelector('#addSiteModal .btn-primary');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = 'Adding...';
     submitBtn.disabled = true;
-    
+
     // Try to fetch the actual favicon
     const faviconUrl = await fetchActualFavicon(fullUrl, domain);
-    
+
     // Find target category and add site
     const category = categories.find(cat => cat.id === categoryId);
     if (category) {
         category.websites.push({
-            id:         generateSiteId(),
-            name:       name,
-            url:        fullUrl,
-            domain:     domain,
+            id: generateSiteId(),
+            name: name,
+            url: fullUrl,
+            domain: domain,
             customIcon: faviconUrl
         });
-        
+
         saveCategories();
-        
+
         // Only update the affected category grid
         const categoryIndex = categories.indexOf(category);
         updateCategoryGrid(categoryIndex);
     }
-    
+
     // Reset button state
     submitBtn.textContent = originalText;
     submitBtn.disabled = false;
-    
+
     closeAddSiteModal();
 }
 
@@ -1774,7 +1774,7 @@ async function fetchActualFavicon(url, domain) {
     try {
         const origin = new URL(url).origin;
         // Domain is already cleaned by getRootDomain (e.g., abc.com)
-        
+
         // Try multiple high-quality favicon sources in order of preference
         const faviconSources = [
             // Google's favicon service - most reliable and works for almost all sites
@@ -1792,7 +1792,7 @@ async function fetchActualFavicon(url, domain) {
             // Favicon Kit API
             `https://api.faviconkit.com/${domain}/128`
         ];
-        
+
         // Try to load each source with a simple image test
         for (const source of faviconSources) {
             try {
@@ -1805,7 +1805,7 @@ async function fetchActualFavicon(url, domain) {
                     // Timeout after 3 seconds
                     setTimeout(() => reject(false), 3000);
                 });
-                
+
                 if (testLoad) {
                     return source;
                 }
@@ -1813,7 +1813,7 @@ async function fetchActualFavicon(url, domain) {
                 continue;
             }
         }
-        
+
         // Ultimate fallback to Google's favicon service
         return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
     } catch (e) {
@@ -1831,7 +1831,7 @@ function openSectionModal(mode = 'add', categoryIndex = null) {
     const submitBtn = modal.querySelector('.btn-primary');
     const nameInput = elements.sectionNameInput || document.getElementById('sectionName');
     const iconInput = elements.sectionIconInput || document.getElementById('sectionIcon');
-    
+
     if (mode === 'edit' && categoryIndex !== null && categories[categoryIndex]) {
         const category = categories[categoryIndex];
         nameInput.value = getCategoryDisplayName(category) || category.name || '';
@@ -1845,7 +1845,7 @@ function openSectionModal(mode = 'add', categoryIndex = null) {
         submitBtn.textContent = 'Add Section';
         editingSectionIndex = null;
     }
-    
+
     modal.style.display = 'flex';
     nameInput.focus();
 }
@@ -1875,7 +1875,7 @@ function handleSectionSubmit(e) {
     }
     let iconValue = rawIcon || rawName.charAt(0).toUpperCase() || '📁';
     iconValue = iconValue.substring(0, 2); // prevent long strings
-    
+
     if (sectionModalMode === 'edit' && editingSectionIndex !== null && categories[editingSectionIndex]) {
         categories[editingSectionIndex].name = rawName;
         categories[editingSectionIndex].icon = iconValue;
@@ -1888,7 +1888,7 @@ function handleSectionSubmit(e) {
         };
         categories.push(newCategory);
     }
-    
+
     saveCategories();
     populateCategoryDropdowns();
     renderShortcuts();
@@ -1953,7 +1953,7 @@ const MAX_HISTORY_ITEMS = 8;
 function initUnifiedSearch() {
     const savedEngine = localStorage.getItem('selectedSearchEngine') || 'google';
     selectSearchEngine(savedEngine, false);
-    
+
     setupEngineDropdown();
     setupSearchHistory();
 }
@@ -1962,9 +1962,9 @@ function initUnifiedSearch() {
 function setupEngineDropdown() {
     const selector = document.getElementById('engineSelector');
     const dropdown = document.getElementById('engineDropdown');
-    
+
     if (!selector || !dropdown) return;
-    
+
     // Toggle dropdown on click
     selector.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1972,7 +1972,7 @@ function setupEngineDropdown() {
         dropdown.classList.toggle('show');
         selector.setAttribute('aria-expanded', !isOpen);
     });
-    
+
     // Engine option clicks
     dropdown.querySelectorAll('.engine-option').forEach(option => {
         option.addEventListener('click', (e) => {
@@ -1983,7 +1983,7 @@ function setupEngineDropdown() {
             selector.setAttribute('aria-expanded', 'false');
         });
     });
-    
+
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!selector.contains(e.target) && !dropdown.contains(e.target)) {
@@ -1991,7 +1991,7 @@ function setupEngineDropdown() {
             selector.setAttribute('aria-expanded', 'false');
         }
     });
-    
+
     // Close dropdown on Escape key
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -2005,38 +2005,38 @@ function setupEngineDropdown() {
 function selectSearchEngine(engineKey, save = true) {
     const engine = searchEngines[engineKey];
     if (!engine) return;
-    
+
     currentEngine = engineKey;
-    
+
     // Update widget styling
     const widget = document.getElementById('unifiedSearchWidget');
     const iconElement = document.getElementById('currentEngineIcon');
     const input = document.getElementById('unifiedSearchInput');
     const submitBtn = document.getElementById('searchSubmitBtn');
-    
+
     if (widget) {
         widget.style.setProperty('--engine-color', engine.color);
     }
-    
+
     if (iconElement) {
         iconElement.className = engine.icon;
     }
-    
+
     if (input) {
         input.placeholder = engine.placeholder;
     }
-    
+
     // Update active state in dropdown
     document.querySelectorAll('.engine-option').forEach(option => {
         option.classList.toggle('active', option.dataset.engine === engineKey);
     });
-    
+
     // Save preference
     if (save) {
         localStorage.setItem('selectedSearchEngine', engineKey);
         scheduleFirestoreSync(); // Sync engine preference to Firestore
     }
-    
+
     // Hide history dropdown when switching engines
     hideSearchHistory();
 }
@@ -2044,25 +2044,25 @@ function selectSearchEngine(engineKey, save = true) {
 // Perform search with current engine
 function performUnifiedSearch(event) {
     event.preventDefault();
-    
+
     const input = document.getElementById('unifiedSearchInput');
     const query = input.value.trim();
-    
+
     if (!query) return false;
-    
+
     const engine = searchEngines[currentEngine];
     if (!engine) return false;
-    
+
     // Save to search history (per engine)
     saveToSearchHistory(currentEngine, query);
-    
+
     // Open search in same tab
     window.location.href = `${engine.url}${encodeURIComponent(query)}`;
-    
+
     // Clear input
     input.value = '';
     hideSearchHistory();
-    
+
     return false;
 }
 
@@ -2073,19 +2073,19 @@ function performUnifiedSearch(event) {
 function setupSearchHistory() {
     const input = document.getElementById('unifiedSearchInput');
     const historyDropdown = document.getElementById('searchHistoryDropdown');
-    
+
     if (!input || !historyDropdown) return;
-    
+
     // Show history on focus (for all engines now)
     input.addEventListener('focus', () => {
         showSearchHistory();
     });
-    
+
     // Filter history as user types
     input.addEventListener('input', () => {
         showSearchHistory(input.value);
     });
-    
+
     // Hide history when clicking outside
     document.addEventListener('click', (e) => {
         const inputWrapper = input.closest('.search-input-wrapper');
@@ -2093,7 +2093,7 @@ function setupSearchHistory() {
             hideSearchHistory();
         }
     });
-    
+
     // Keyboard navigation
     input.addEventListener('keydown', (e) => {
         handleHistoryNavigation(e);
@@ -2109,16 +2109,16 @@ function getSearchHistory(engine) {
 function saveToSearchHistory(engine, query) {
     const historyKey = `searchHistory_${engine}`;
     let history = getSearchHistory(engine);
-    
+
     // Remove duplicate if exists
     history = history.filter(item => item.toLowerCase() !== query.toLowerCase());
-    
+
     // Add to beginning
     history.unshift(query);
-    
+
     // Limit to max items
     history = history.slice(0, MAX_HISTORY_ITEMS);
-    
+
     localStorage.setItem(historyKey, JSON.stringify(history));
 }
 
@@ -2132,25 +2132,25 @@ function removeFromSearchHistory(engine, query) {
 function showSearchHistory(filterText = '') {
     const historyDropdown = document.getElementById('searchHistoryDropdown');
     const input = document.getElementById('unifiedSearchInput');
-    
+
     if (!historyDropdown) return;
-    
+
     let history = getSearchHistory(currentEngine);
-    
+
     // Filter by input text
     if (filterText) {
-        history = history.filter(item => 
+        history = history.filter(item =>
             item.toLowerCase().includes(filterText.toLowerCase())
         );
     }
-    
+
     if (history.length === 0) {
         historyDropdown.classList.remove('show');
         return;
     }
-    
+
     const engineConfig = searchEngines[currentEngine];
-    
+
     historyDropdown.innerHTML = history.map((item, index) => `
         <div class="history-item" data-index="${index}" data-query="${escapeHtml(item)}">
             <i class="fas fa-history"></i>
@@ -2160,7 +2160,7 @@ function showSearchHistory(filterText = '') {
             </button>
         </div>
     `).join('');
-    
+
     // Add click handlers
     historyDropdown.querySelectorAll('.history-item').forEach(item => {
         item.addEventListener('click', (e) => {
@@ -2171,7 +2171,7 @@ function showSearchHistory(filterText = '') {
             }
         });
     });
-    
+
     // Add remove handlers
     historyDropdown.querySelectorAll('.history-remove').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -2180,7 +2180,7 @@ function showSearchHistory(filterText = '') {
             showSearchHistory(input.value);
         });
     });
-    
+
     historyDropdown.classList.add('show');
 }
 
@@ -2194,17 +2194,17 @@ function hideSearchHistory() {
 function handleHistoryNavigation(e) {
     const historyDropdown = document.getElementById('searchHistoryDropdown');
     const input = document.getElementById('unifiedSearchInput');
-    
+
     if (!historyDropdown.classList.contains('show')) return;
-    
+
     const items = historyDropdown.querySelectorAll('.history-item');
     const activeItem = historyDropdown.querySelector('.history-item.active');
     let activeIndex = -1;
-    
+
     if (activeItem) {
         activeIndex = parseInt(activeItem.dataset.index);
     }
-    
+
     if (e.key === 'ArrowDown') {
         e.preventDefault();
         const nextIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
@@ -2226,7 +2226,7 @@ function updateActiveHistoryItem(items, activeIndex) {
     items.forEach((item, index) => {
         item.classList.toggle('active', index === activeIndex);
     });
-    
+
     // Update input value to match highlighted item
     const input = document.getElementById('unifiedSearchInput');
     if (items[activeIndex]) {
@@ -2243,8 +2243,8 @@ function escapeHtml(text) {
 // Legacy search functions (kept for backwards compatibility)
 function searchGoogle(event) {
     event.preventDefault();
-    const query = document.getElementById('googleSearch')?.value.trim() || 
-                  document.getElementById('unifiedSearchInput')?.value.trim();
+    const query = document.getElementById('googleSearch')?.value.trim() ||
+        document.getElementById('unifiedSearchInput')?.value.trim();
     if (query) {
         saveToSearchHistory('google', query);
         window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
@@ -2255,7 +2255,7 @@ function searchGoogle(event) {
 function searchYouTube(event) {
     event.preventDefault();
     const query = document.getElementById('youtubeSearch')?.value.trim() ||
-                  document.getElementById('unifiedSearchInput')?.value.trim();
+        document.getElementById('unifiedSearchInput')?.value.trim();
     if (query) {
         saveToSearchHistory('youtube', query);
         window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
@@ -2266,7 +2266,7 @@ function searchYouTube(event) {
 function searchPerplexity(event) {
     event.preventDefault();
     const query = document.getElementById('perplexitySearch')?.value.trim() ||
-                  document.getElementById('unifiedSearchInput')?.value.trim();
+        document.getElementById('unifiedSearchInput')?.value.trim();
     if (query) {
         saveToSearchHistory('perplexity', query);
         window.location.href = `https://www.perplexity.ai/search?q=${encodeURIComponent(query)}`;
@@ -2277,7 +2277,7 @@ function searchPerplexity(event) {
 function searchX(event) {
     event.preventDefault();
     const query = document.getElementById('xSearch')?.value.trim() ||
-                  document.getElementById('unifiedSearchInput')?.value.trim();
+        document.getElementById('unifiedSearchInput')?.value.trim();
     if (query) {
         saveToSearchHistory('x', query);
         window.location.href = `https://twitter.com/search?q=${encodeURIComponent(query)}`;
@@ -2288,7 +2288,7 @@ function searchX(event) {
 function searchReddit(event) {
     event.preventDefault();
     const query = document.getElementById('redditSearch')?.value.trim() ||
-                  document.getElementById('unifiedSearchInput')?.value.trim();
+        document.getElementById('unifiedSearchInput')?.value.trim();
     if (query) {
         saveToSearchHistory('reddit', query);
         window.location.href = `https://www.reddit.com/search/?q=${encodeURIComponent(query)}`;
@@ -2321,7 +2321,7 @@ inputs.forEach(input => {
 function populateCategoryDropdowns() {
     const addCategorySelect = document.getElementById('siteCategory');
     const editCategorySelect = document.getElementById('editSiteCategory');
-    
+
     if (addCategorySelect) {
         addCategorySelect.innerHTML = '';
         categories.forEach(cat => {
@@ -2331,7 +2331,7 @@ function populateCategoryDropdowns() {
             addCategorySelect.appendChild(option);
         });
     }
-    
+
     if (editCategorySelect) {
         editCategorySelect.innerHTML = '';
         categories.forEach(cat => {
@@ -2355,7 +2355,7 @@ function exportData() {
         exportedAt: new Date().toISOString(),
         version: '1.0'
     };
-    
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2366,7 +2366,7 @@ function exportData() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     // Show success message
     showNotification('Data exported successfully! Check your Downloads folder.', 'success');
 }
@@ -2379,26 +2379,35 @@ function importData() {
 function handleImportFile(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
-    reader.onload = (e) => {
+
+    // Make the onload callback async so we can await the database write
+    reader.onload = async (e) => {
         try {
             const data = JSON.parse(e.target.result);
-            
+
             // Validate data structure
             if (!data.categories || !Array.isArray(data.categories)) {
                 throw new Error('Invalid data format: missing categories array');
             }
-            
+
             // Confirm before overwriting
             if (!confirm('This will replace all your current data. Continue?')) {
                 return;
             }
-            
-            // Import data
+
+            // 1. Update the local variable
             categories = data.categories;
-            saveCategories();
-            
+
+            // 2. Update localStorage immediately for offline fallback
+            localStorage.setItem('categories', JSON.stringify(categories));
+
+            // 3. Force an IMMEDIATE sync to Firestore (bypassing the 2-second delay)
+            if (window.fs && window.currentUser) {
+                await forceSyncToFirestore();
+            }
+
             // Restore other settings
             if (data.categoryStates) {
                 localStorage.setItem('categoryStates', JSON.stringify(data.categoryStates));
@@ -2406,25 +2415,25 @@ function handleImportFile(event) {
             if (data.websites) {
                 localStorage.setItem('websites', JSON.stringify(data.websites));
             }
-            
-            // Refresh the page to show imported data
+
+            // Refresh the page to show imported data safely
             showNotification('Data imported successfully! Refreshing...', 'success');
             setTimeout(() => {
                 location.reload();
-            }, 1500);
-            
+            }, 1000); // Shortened the reload time since the DB write is already confirmed
+
         } catch (error) {
             console.error('Import error:', error);
             showNotification('Error importing data: ' + error.message, 'error');
         }
     };
-    
+
     reader.onerror = () => {
         showNotification('Error reading file', 'error');
     };
-    
+
     reader.readAsText(file);
-    
+
     // Reset file input
     event.target.value = '';
 }
@@ -2435,7 +2444,7 @@ function showNotification(message, type = 'info') {
     if (existing) {
         existing.remove();
     }
-    
+
     const notification = document.createElement('div');
     notification.id = 'notification';
     notification.textContent = message;
@@ -2453,7 +2462,7 @@ function showNotification(message, type = 'info') {
         -webkit-backdrop-filter: blur(10px);
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     `;
-    
+
     if (type === 'success') {
         notification.style.background = 'rgba(52, 211, 153, 0.9)';
         notification.style.color = 'white';
@@ -2464,9 +2473,9 @@ function showNotification(message, type = 'info') {
         notification.style.background = 'rgba(102, 126, 234, 0.9)';
         notification.style.color = 'white';
     }
-    
+
     document.body.appendChild(notification);
-    
+
     // Auto-remove after 3 seconds
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
@@ -2478,7 +2487,7 @@ function showNotification(message, type = 'info') {
 function setupModalHandlers() {
     // Populate category dropdowns
     populateCategoryDropdowns();
-    
+
     if (elements.addSectionBtn) {
         elements.addSectionBtn.addEventListener('click', () => openSectionModal('add'));
     }
@@ -2497,7 +2506,7 @@ function setupModalHandlers() {
     if (cancelSectionBtn) {
         cancelSectionBtn.addEventListener('click', closeSectionModal);
     }
-    
+
     // Setup add modal handlers
     document.getElementById('closeModal').addEventListener('click', closeAddSiteModal);
     document.getElementById('cancelBtn').addEventListener('click', closeAddSiteModal);
@@ -2505,7 +2514,7 @@ function setupModalHandlers() {
         e.preventDefault();
         addNewSite();
     });
-    
+
     // Setup edit modal handlers
     document.getElementById('closeEditModal').addEventListener('click', closeEditSiteModal);
     document.getElementById('cancelEditBtn').addEventListener('click', closeEditSiteModal);
@@ -2513,7 +2522,7 @@ function setupModalHandlers() {
         e.preventDefault();
         updateSite();
     });
-    
+
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
         const addModal = elements.addModal || document.getElementById('addSiteModal');
@@ -2554,11 +2563,11 @@ document.addEventListener('foyer-auth-ready', async () => {
     setupHeartButton();
 
     // Export/Import (kept as safety fallback)
-    const exportBtn      = document.getElementById('exportDataBtn');
-    const importBtn      = document.getElementById('importDataBtn');
+    const exportBtn = document.getElementById('exportDataBtn');
+    const importBtn = document.getElementById('importDataBtn');
     const importFileInput = document.getElementById('importFileInput');
-    if (exportBtn)       exportBtn.addEventListener('click', exportData);
-    if (importBtn)       importBtn.addEventListener('click', importData);
+    if (exportBtn) exportBtn.addEventListener('click', exportData);
+    if (importBtn) importBtn.addEventListener('click', importData);
     if (importFileInput) importFileInput.addEventListener('change', handleImportFile);
 });
 
@@ -2570,7 +2579,7 @@ document.addEventListener('keydown', (e) => {
         const googleSearch = document.getElementById('googleSearch');
         if (googleSearch) googleSearch.focus();
     }
-    
+
     // ESC to close modal
     if (e.key === 'Escape') {
         const addModal = elements.addModal || document.getElementById('addSiteModal');
