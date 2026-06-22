@@ -4,9 +4,7 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**",
-      "functions/**",
-      "cloudflare-worker/**"
+      "**/node_modules/**"
     ]
   }
 }
