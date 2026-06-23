@@ -36,6 +36,9 @@ const UNSPLASH_CONFIG = {
     orientation: 'landscape' // landscape, portrait, or squarish
 };
 
+// Variable to hold user's custom keywords (defaults to config string)
+let customWallpaperKeywords = UNSPLASH_CONFIG.query;
+
 // ========================================
 // SHORTCUT MENU SYSTEM
 // ========================================
@@ -96,7 +99,7 @@ let currentUnsplashPhotoUrl = null;  // Unsplash page URL for the current photo
 
 // Get a random keyword different from the last one
 function getRandomWallpaperKeyword() {
-    const keywords = UNSPLASH_CONFIG.query.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    const keywords = customWallpaperKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
 
     if (keywords.length <= 1) {
         return keywords[0] || 'nature';
@@ -649,7 +652,8 @@ async function syncToFirestore() {
             settings: {
                 wallpaperEnabled: localStorage.getItem('wallpaperEnabled') !== 'false',
                 selectedSearchEngine: localStorage.getItem('selectedSearchEngine') || 'google',
-                lastWallpaperKeyword: localStorage.getItem('lastWallpaperKeyword') || ''
+                lastWallpaperKeyword: localStorage.getItem('lastWallpaperKeyword') || '',
+                customWallpaperKeywords: customWallpaperKeywords
             }
         }, { merge: true });
 
@@ -683,6 +687,9 @@ async function loadUserSettingsFromFirestore() {
             if (s.lastWallpaperKeyword) {
                 lastWallpaperKeyword = s.lastWallpaperKeyword;
                 localStorage.setItem('lastWallpaperKeyword', s.lastWallpaperKeyword);
+            }
+            if (s.customWallpaperKeywords) {
+                customWallpaperKeywords = s.customWallpaperKeywords;
             }
         }
     } catch (err) {
@@ -2484,6 +2491,7 @@ function showNotification(message, type = 'info') {
 }
 
 // Setup modal event handlers
+// Setup modal event handlers
 function setupModalHandlers() {
     // Populate category dropdowns
     populateCategoryDropdowns();
@@ -2523,11 +2531,55 @@ function setupModalHandlers() {
         updateSite();
     });
 
+    // --- Settings Modal Handlers ---
+    const settingsModal = document.getElementById('settingsModal');
+    const openSettingsBtn = document.getElementById('openSettingsBtn');
+    const closeSettingsModalBtn = document.getElementById('closeSettingsModal');
+    const cancelSettingsBtnModal = document.getElementById('cancelSettingsBtn');
+    const settingsForm = document.getElementById('settingsForm');
+
+    if (openSettingsBtn) {
+        openSettingsBtn.addEventListener('click', () => {
+            // Close the user menu dropdown first
+            document.getElementById('userMenu').classList.remove('show');
+            // Populate the textarea with current keywords
+            document.getElementById('wallpaperKeywords').value = customWallpaperKeywords;
+            // Show the modal
+            settingsModal.style.display = 'flex';
+        });
+    }
+
+    const closeSettings = () => { 
+        if (settingsModal) settingsModal.style.display = 'none'; 
+    };
+    
+    if (closeSettingsModalBtn) closeSettingsModalBtn.addEventListener('click', closeSettings);
+    if (cancelSettingsBtnModal) cancelSettingsBtnModal.addEventListener('click', closeSettings);
+
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newKeywords = document.getElementById('wallpaperKeywords').value.trim();
+            
+            // Update the variable
+            customWallpaperKeywords = newKeywords || UNSPLASH_CONFIG.query; // Fallback to default if empty
+            
+            // Save to Firestore
+            scheduleFirestoreSync();
+            
+            // Show success and fetch a new wallpaper immediately with the new keywords
+            showToast('Settings saved successfully!');
+            fetchUnsplashWallpaper();
+            closeSettings();
+        });
+    }
+
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
         const addModal = elements.addModal || document.getElementById('addSiteModal');
         const editModal = elements.editModal || document.getElementById('editSiteModal');
         const sectionModal = elements.sectionModal || document.getElementById('sectionModal');
+        
         if (e.target === addModal) {
             closeAddSiteModal();
         }
@@ -2537,13 +2589,12 @@ function setupModalHandlers() {
         if (e.target === sectionModal) {
             closeSectionModal();
         }
+        if (e.target === settingsModal) {
+            closeSettings();
+        }
     });
 }
 
-// Initialize app only after Firebase auth confirms the user is signed in
-// (Event fired by firebase-auth-guard.js)
-// Initialize app only after Firebase auth confirms the user is signed in
-// (Event fired by firebase-auth-guard.js)
 // Initialize app only after Firebase auth confirms the user is signed in
 // (Event fired by firebase-auth-guard.js)
 document.addEventListener('foyer-auth-ready', async () => {

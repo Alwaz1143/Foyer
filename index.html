@@ -38,6 +38,12 @@
                 <div class="user-menu-email" id="userMenuEmail"></div>
             </div>
             <div class="user-menu-sep"></div>
+
+            <button class="user-menu-item" id="openSettingsBtn" type="button">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </button>
+
             <button class="user-menu-item" id="unsplashConnectBtn" type="button">
                 <i class="fas fa-camera-retro"></i>
                 <span>Connect Unsplash</span>
@@ -133,6 +139,27 @@
         <section class="shortcuts-grid" id="shortcutsGrid">
             <!-- Icons will be dynamically inserted here by JavaScript -->
         </section>
+    </div>
+
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Foyer Settings</h2>
+                <button class="close-btn" id="closeSettingsModal" aria-label="Close settings">&times;</button>
+            </div>
+            <form id="settingsForm" class="modal-form">
+                <div class="form-group">
+                    <label for="wallpaperKeywords">Unsplash Wallpaper Keywords (comma separated):</label>
+                    <textarea id="wallpaperKeywords" rows="4"
+                        placeholder="e.g., Mountains, Ocean waves, Cyberpunk city..."
+                        style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--input-text); font-family: inherit; resize: vertical;"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="cancelSettingsBtn">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Settings</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Add Site Modal -->
