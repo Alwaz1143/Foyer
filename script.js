@@ -2544,6 +2544,8 @@ function setupModalHandlers() {
 // (Event fired by firebase-auth-guard.js)
 // Initialize app only after Firebase auth confirms the user is signed in
 // (Event fired by firebase-auth-guard.js)
+// Initialize app only after Firebase auth confirms the user is signed in
+// (Event fired by firebase-auth-guard.js)
 document.addEventListener('foyer-auth-ready', async () => {
     // Initialize cached element refs
     initElements();
@@ -2557,14 +2559,21 @@ document.addEventListener('foyer-auth-ready', async () => {
     await loadUserSettingsFromFirestore();
     await loadUnsplashState();
 
-    // 3. CLOUD SYNC: Fetch fresh layout from Firestore and re-render silently
+    // 3. CLOUD SYNC: Fetch fresh layout from Firestore and re-render ONLY if data changed
     if (window.fs && window.currentUser) {
+        // Take a snapshot of the local data we just rendered
+        const localDataSnapshot = JSON.stringify(categories);
+
         await loadCategoriesFromFirestore();
-        renderShortcuts();
+
+        // Only redraw the DOM if the cloud data is actually different!
+        if (JSON.stringify(categories) !== localDataSnapshot) {
+            renderShortcuts();
+        }
     }
 
     setupModalHandlers();
-    
+
     // Wire up the ♥ button with Unsplash-aware behavior
     setupHeartButton();
 
@@ -2572,11 +2581,11 @@ document.addEventListener('foyer-auth-ready', async () => {
     initWallpaper();
 
     // Export/Import (kept as safety fallback)
-    const exportBtn       = document.getElementById('exportDataBtn');
-    const importBtn       = document.getElementById('importDataBtn');
+    const exportBtn = document.getElementById('exportDataBtn');
+    const importBtn = document.getElementById('importDataBtn');
     const importFileInput = document.getElementById('importFileInput');
-    if (exportBtn)       exportBtn.addEventListener('click', exportData);
-    if (importBtn)       importBtn.addEventListener('click', importData);
+    if (exportBtn) exportBtn.addEventListener('click', exportData);
+    if (importBtn) importBtn.addEventListener('click', importData);
     if (importFileInput) importFileInput.addEventListener('change', handleImportFile);
 });
 
