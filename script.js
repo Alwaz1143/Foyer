@@ -134,7 +134,7 @@ async function fetchUnsplashWallpaper() {
 
     // Get a random keyword different from the last one
     const selectedKeyword = getRandomWallpaperKeyword();
-
+    
     // Detect screen orientation - portrait for mobile, landscape for desktop
     const orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
 
@@ -153,34 +153,48 @@ async function fetchUnsplashWallpaper() {
         }
 
         const data = await response.json();
+        
+        // ==========================================
+        // 🚀 PROGRESSIVE LOADING STRATEGY
+        // ==========================================
 
-        // Preload the image
-        const img = new Image();
-        img.onload = () => {
-            wallpaperBg.style.backgroundImage = `url(${data.urls.regular})`;
-            wallpaperBg.classList.add('loaded');
-            document.body.classList.add('wallpaper-active');
+        // 1. INSTANT LOAD: Set a tiny, ultra-fast thumbnail as the background immediately
+        wallpaperBg.style.backgroundImage = `url(${data.urls.thumb})`;
+        wallpaperBg.classList.add('loaded');
+        document.body.classList.add('wallpaper-active');
+        
+        // Show photographer credit instantly
+        if (photographerLink && photoCredit) {
+            photographerLink.textContent = data.user.name;
+            photographerLink.href = `${data.user.links.html}?utm_source=homepage&utm_medium=referral`;
+            photoCredit.classList.add('visible');
+        }
+        
+        // Setup heart button instantly
+        if (imageLink) {
+            const photoUrl = `${data.links.html}?utm_source=foyer&utm_medium=referral`;
+            imageLink.href = photoUrl;
+            currentUnsplashPhotoId  = data.id;
+            currentUnsplashPhotoUrl = photoUrl;
+            imageLink.classList.remove('heart-liked'); // Reset heart color
+        }
 
-            // Show photographer credit (required by Unsplash)
-            if (photographerLink && photoCredit) {
-                photographerLink.textContent = data.user.name;
-                photographerLink.href = `${data.user.links.html}?utm_source=homepage&utm_medium=referral`;
-                photoCredit.classList.add('visible');
-            }
-            // Set heart icon link to the image on Unsplash
-            if (imageLink) {
-                const photoUrl = `${data.links.html}?utm_source=foyer&utm_medium=referral`;
-                imageLink.href = photoUrl;
-                currentUnsplashPhotoId = data.id;
-                currentUnsplashPhotoUrl = photoUrl;
+        // 2. OPTIMIZATION: Calculate the perfect high-res image size
+        // If on mobile (<= 768px wide), fetch a smaller 1080px image. If desktop, fetch 1920px.
+        const optimalWidth = window.innerWidth <= 768 ? 1080 : 1920;
 
-                imageLink.classList.remove('heart-liked');
-            }
+        // Use 'auto=format' to serve next-gen WebP images (30-50% smaller)
+        // Use custom width and quality to save massive amounts of mobile data
+        const highResUrl = `${data.urls.raw}&auto=format&fit=crop&w=${optimalWidth}&q=75`;
+
+        // 3. BACKGROUND LOAD: Fetch the high-res image silently
+        const highResImg = new Image();
+        highResImg.onload = () => {
+            // Once fully downloaded, silently swap out the blurry thumbnail for the crisp image
+            wallpaperBg.style.backgroundImage = `url(${highResUrl})`;
         };
-        img.onerror = () => {
-            console.error('Failed to load wallpaper image');
-        };
-        img.src = data.urls.regular;
+        // Start the background download
+        highResImg.src = highResUrl;
 
     } catch (error) {
         console.error('Failed to fetch Unsplash wallpaper:', error);
