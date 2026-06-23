@@ -96,6 +96,7 @@ let wallpaperEnabled = localStorage.getItem('wallpaperEnabled') !== 'false'; // 
 let lastWallpaperKeyword = localStorage.getItem('lastWallpaperKeyword') || '';
 let currentUnsplashPhotoId = null;  // ID of the currently displayed Unsplash photo
 let currentUnsplashPhotoUrl = null;  // Unsplash page URL for the current photo
+const WALLPAPER_CACHE_KEY = 'wallpaperCache';
 
 // Get a random keyword different from the last one
 function getRandomWallpaperKeyword() {
@@ -154,50 +155,110 @@ async function fetchUnsplashWallpaper() {
 
         const data = await response.json();
         
-        // ==========================================
-        // 🚀 PROGRESSIVE LOADING STRATEGY
-        // ==========================================
-
-        // 1. INSTANT LOAD: Set a tiny, ultra-fast thumbnail as the background immediately
-        wallpaperBg.style.backgroundImage = `url(${data.urls.thumb})`;
-        wallpaperBg.classList.add('loaded');
-        document.body.classList.add('wallpaper-active');
-        
-        // Show photographer credit instantly
-        if (photographerLink && photoCredit) {
-            photographerLink.textContent = data.user.name;
-            photographerLink.href = `${data.user.links.html}?utm_source=homepage&utm_medium=referral`;
-            photoCredit.classList.add('visible');
-        }
-        
-        // Setup heart button instantly
-        if (imageLink) {
-            const photoUrl = `${data.links.html}?utm_source=foyer&utm_medium=referral`;
-            imageLink.href = photoUrl;
-            currentUnsplashPhotoId  = data.id;
-            currentUnsplashPhotoUrl = photoUrl;
-            imageLink.classList.remove('heart-liked'); // Reset heart color
-        }
-
-        // 2. OPTIMIZATION: Calculate the perfect high-res image size
-        // If on mobile (<= 768px wide), fetch a smaller 1080px image. If desktop, fetch 1920px.
         const optimalWidth = window.innerWidth <= 768 ? 1080 : 1920;
-
-        // Use 'auto=format' to serve next-gen WebP images (30-50% smaller)
-        // Use custom width and quality to save massive amounts of mobile data
         const highResUrl = `${data.urls.raw}&auto=format&fit=crop&w=${optimalWidth}&q=75`;
 
-        // 3. BACKGROUND LOAD: Fetch the high-res image silently
-        const highResImg = new Image();
-        highResImg.onload = () => {
-            // Once fully downloaded, silently swap out the blurry thumbnail for the crisp image
-            wallpaperBg.style.backgroundImage = `url(${highResUrl})`;
-        };
-        // Start the background download
-        highResImg.src = highResUrl;
+        applyWallpaperPhoto({
+            id: data.id,
+            photoUrl: `${data.links.html}?utm_source=foyer&utm_medium=referral`,
+            photographerName: data.user.name,
+            photographerUrl: `${data.user.links.html}?utm_source=homepage&utm_medium=referral`
+        }, data.urls.small || data.urls.thumb, highResUrl);
+
+        localStorage.setItem(WALLPAPER_CACHE_KEY, JSON.stringify({
+            id: data.id,
+            previewUrl: data.urls.small || data.urls.thumb,
+            highResUrl,
+            photoUrl: `${data.links.html}?utm_source=foyer&utm_medium=referral`,
+            photographerName: data.user.name,
+            photographerUrl: `${data.user.links.html}?utm_source=homepage&utm_medium=referral`
+        }));
 
     } catch (error) {
         console.error('Failed to fetch Unsplash wallpaper:', error);
+    }
+}
+
+function applyWallpaperPhoto(photo, previewUrl, fullUrl) {
+    const wallpaperBg = document.getElementById('wallpaperBackground');
+    const photoCredit = document.getElementById('photoCredit');
+    const photographerLink = document.getElementById('photographerLink');
+    const imageLink = document.getElementById('imageLink');
+
+    if (!wallpaperBg) return;
+
+    wallpaperBg.style.backgroundImage = `url(${previewUrl})`;
+    wallpaperBg.classList.add('loaded');
+    document.body.classList.add('wallpaper-active');
+
+    if (photographerLink && photoCredit) {
+        photographerLink.textContent = photo.photographerName;
+        photographerLink.href = photo.photographerUrl;
+        photoCredit.classList.add('visible');
+    }
+
+    if (imageLink) {
+        imageLink.href = photo.photoUrl;
+        currentUnsplashPhotoId = photo.id;
+        currentUnsplashPhotoUrl = photo.photoUrl;
+        imageLink.classList.remove('heart-liked');
+    }
+
+    if (fullUrl) {
+        const highResImg = new Image();
+        highResImg.decoding = 'async';
+        highResImg.fetchPriority = 'low';
+        highResImg.onload = () => {
+            wallpaperBg.style.backgroundImage = `url(${fullUrl})`;
+        };
+        highResImg.src = fullUrl;
+    }
+}
+
+function restoreCachedWallpaper() {
+    const wallpaperBg = document.getElementById('wallpaperBackground');
+    const photoCredit = document.getElementById('photoCredit');
+    const photographerLink = document.getElementById('photographerLink');
+    const imageLink = document.getElementById('imageLink');
+
+    if (!wallpaperBg) return false;
+
+    try {
+        const cached = JSON.parse(localStorage.getItem(WALLPAPER_CACHE_KEY) || 'null');
+        if (!cached || !cached.previewUrl || !cached.photoUrl || !cached.photographerName || !cached.photographerUrl) {
+            return false;
+        }
+
+        wallpaperBg.style.backgroundImage = `url(${cached.previewUrl})`;
+        wallpaperBg.classList.add('loaded');
+        document.body.classList.add('wallpaper-active');
+
+        if (photographerLink && photoCredit) {
+            photographerLink.textContent = cached.photographerName;
+            photographerLink.href = cached.photographerUrl;
+            photoCredit.classList.add('visible');
+        }
+
+        if (imageLink) {
+            imageLink.href = cached.photoUrl;
+            currentUnsplashPhotoId = cached.id || null;
+            currentUnsplashPhotoUrl = cached.photoUrl;
+            imageLink.classList.remove('heart-liked');
+        }
+
+        if (cached.highResUrl) {
+            const cachedHighRes = new Image();
+            cachedHighRes.decoding = 'async';
+            cachedHighRes.fetchPriority = 'low';
+            cachedHighRes.onload = () => {
+                wallpaperBg.style.backgroundImage = `url(${cached.highResUrl})`;
+            };
+            cachedHighRes.src = cached.highResUrl;
+        }
+
+        return true;
+    } catch (error) {
+        return false;
     }
 }
 
@@ -243,6 +304,7 @@ function initWallpaper() {
 
     // Fetch wallpaper if enabled
     if (wallpaperEnabled) {
+        restoreCachedWallpaper();
         fetchUnsplashWallpaper();
     }
 }
@@ -2611,31 +2673,27 @@ function setupModalHandlers() {
 
 // Initialize app only after Firebase auth confirms the user is signed in
 // (Event fired by firebase-auth-guard.js)
+let appBootstrapped = false;
 document.addEventListener('foyer-auth-ready', async () => {
+    if (appBootstrapped) return;
+    appBootstrapped = true;
+
     // Initialize cached element refs
     initElements();
 
-    // 1. INSTANT UI: Draw apps from local storage immediately so there is no waiting
-    loadCategoriesFromLocalStorage();
-    renderShortcuts();
-    initUnifiedSearch();
-
-    // 2. BACKGROUND SYNC: Fetch cloud settings quietly
+    // Load user-specific state before the first render so the homepage paints once.
     await loadUserSettingsFromFirestore();
     await loadUnsplashState();
 
-    // 3. CLOUD SYNC: Fetch fresh layout from Firestore and re-render ONLY if data changed
+    // Load the best available category source once, then render once.
     if (window.fs && window.currentUser) {
-        // Take a snapshot of the local data we just rendered
-        const localDataSnapshot = JSON.stringify(categories);
-
         await loadCategoriesFromFirestore();
-
-        // Only redraw the DOM if the cloud data is actually different!
-        if (JSON.stringify(categories) !== localDataSnapshot) {
-            renderShortcuts();
-        }
+    } else {
+        loadCategoriesFromLocalStorage();
     }
+
+    renderShortcuts();
+    initUnifiedSearch();
 
     setupModalHandlers();
 
