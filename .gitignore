@@ -31,3 +31,7 @@ firestore-debug.log
 
 # ── Wrangler ─────────────────────────────────────────────────
 **/.wrangler/
+
+
+# Next.js build output
+.next/
