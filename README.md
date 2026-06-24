@@ -111,3 +111,5 @@ Because single-page applications cannot safely store API secrets, Foyer uses a C
 Serve the root directory using any local development server (e.g., VS Code Live Server, Python `http.server`, or Node `http-server`).
 
 * **Note:** Ensure your local development port matches the `redirectUri` configured in your Unsplash Developer dashboard (e.g., `http://127.0.0.1:5500/unsplash-callback.html`).
+
+<!-- ---------------------------------------------------------------------------------------------------------------------------------------------------- -->
