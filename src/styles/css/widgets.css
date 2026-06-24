@@ -1,0 +1,412 @@
+/* ============================================
+   Search Widgets Styles
+   ============================================ */
+
+/* Search Widgets Section */
+.search-widgets {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 50px;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+    position: relative;
+    z-index: 1500;
+}
+
+.search-widgets .widget {
+    flex: 1 1 100%;
+    max-width: 600px;
+    min-width: 320px;
+}
+
+.widget {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 0 8px 32px var(--card-shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    position: relative;
+
+
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(3px) !important;
+}
+
+.widget::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--engine-color, var(--accent-primary)), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.widget:hover::before {
+    opacity: 1;
+}
+
+.widget:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 16px 48px var(--card-shadow);
+    border-color: var(--engine-color, var(--accent-primary));
+}
+
+/* Unified Search Widget Header */
+.widget-header {
+    display: flex;
+    justify-content: center;
+    position: relative;
+}
+
+/* Engine Selector Button */
+.engine-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    font-size: 36px;
+    color: var(--engine-color, #4285F4);
+}
+
+.engine-selector:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.engine-dropdown-arrow {
+    font-size: 12px;
+    transition: transform 0.2s ease;
+    color: var(--input-text);
+    opacity: 0.6;
+}
+
+.engine-selector[aria-expanded="true"] .engine-dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+/* Engine Dropdown Menu */
+.engine-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    padding: 8px;
+    min-width: 180px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-50%) translateY(16px);
+    transition: all 0.2s ease;
+    z-index: 100;
+}
+
+.engine-dropdown.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(8px);
+}
+
+.engine-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 15px;
+    color: var(--input-text);
+    text-align: left;
+}
+
+.engine-option:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.engine-option.active {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.engine-option i {
+    font-size: 20px;
+    width: 24px;
+    text-align: center;
+}
+
+.engine-option[data-engine="google"] i { color: #4285F4; }
+.engine-option[data-engine="youtube"] i { color: #FF0000; }
+.engine-option[data-engine="perplexity"] i { color: #20808D; }
+.engine-option[data-engine="x"] i { color: #000000; }
+.engine-option[data-engine="reddit"] i { color: #FF4500; }
+
+.engine-option span {
+    font-weight: 500;
+}
+
+/* Widget Icon (for backwards compatibility) */
+.widget-icon {
+    font-size: 36px;
+    text-align: center;
+}
+
+/* Widget Brand Colors (legacy support) */
+.google-widget .widget-icon {
+    color: #4285F4;
+}
+
+.youtube-widget .widget-icon {
+    color: #FF0000;
+}
+
+.perplexity-widget .widget-icon {
+    color: #20808D;
+}
+
+.x-widget .widget-icon {
+    color: #000000;
+}
+
+.reddit-widget .widget-icon {
+    color: #FF4500;
+}
+
+.widget-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Search Input Wrapper */
+.search-input-wrapper {
+    flex: 1;
+    position: relative;
+}
+
+.widget-input {
+    width: 100%;
+    padding: 14px 18px;
+    border: 2px solid var(--input-border);
+    border-radius: 14px;
+    background-color: var(--input-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    color: var(--input-text);
+    font-size: 16px;
+    outline: none;
+    transition: all 0.3s ease;
+    min-width: 0;
+}
+
+.widget-input::placeholder {
+    color: rgba(0, 0, 0, 0.3);
+}
+
+/* Unified Widget Input Focus */
+.unified-search-widget .widget-input:focus {
+    border-color: var(--engine-color, #4285F4);
+    background-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--engine-color, #4285F4) 30%, transparent);
+}
+
+/* Legacy Widget Input Focus Colors */
+.google-widget .widget-input:focus {
+    border-color: #4285F4;
+}
+
+.youtube-widget .widget-input:focus {
+    border-color: #FF0000;
+}
+
+.perplexity-widget .widget-input:focus {
+    border-color: #20808D;
+}
+
+.x-widget .widget-input:focus {
+    border-color: #1DA1F2;
+}
+
+.reddit-widget .widget-input:focus {
+    border-color: #FF4500;
+}
+
+/* Search History Dropdown */
+.search-history-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 8px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    max-height: 230px;
+    overflow-y: auto;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+    transition: all 0.2s ease;
+    z-index: 1000;
+}
+
+/* Custom scrollbar for search history */
+.search-history-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.search-history-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0;
+}
+
+.search-history-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.search-history-dropdown::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.search-history-dropdown.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-item:hover,
+.history-item.active {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.history-item i.fa-history {
+    color: var(--engine-color, #667eea);
+    font-size: 14px;
+    opacity: 0.6;
+}
+
+.history-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--input-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-remove {
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: rgba(0, 0, 0, 0.4);
+    font-size: 12px;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    opacity: 0;
+}
+
+.history-item:hover .history-remove {
+    opacity: 1;
+}
+
+.history-remove:hover {
+    background: rgba(255, 0, 0, 0.1);
+    color: #ff4444;
+}
+
+/* Widget Button */
+.widget-btn {
+    width: 50px;
+    height: 50px;
+    border: none;
+    border-radius: 14px;
+    background: var(--engine-color, #4285F4);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.widget-btn i {
+    color: white;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.widget-btn:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    filter: brightness(1.1);
+}
+
+.widget-btn:active {
+    transform: scale(0.95);
+}
+
+/* Legacy Widget Button Colors */
+.google-widget .widget-btn {
+    background-color: #4285F4;
+}
+
+.youtube-widget .widget-btn {
+    background-color: #FF0000;
+}
+
+.perplexity-widget .widget-btn {
+    background-color: #20808D;
+}
+
+.x-widget .widget-btn {
+    background-color: #000000;
+}
+
+.reddit-widget .widget-btn {
+    background-color: #FF4500;
+}

@@ -1,0 +1,35 @@
+/* ============================================
+   CSS Variables and Reset Styles
+   ============================================ */
+
+:root {
+    --bg-color: #f5f7fa;
+    --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* --text-color: #1a1a2e; */
+    --text-color: #fff;
+    --card-bg: rgb(255, 255, 255);
+    --card-border: rgba(0, 0, 0, 0.08);
+    --card-shadow: rgba(0, 0, 0, 0.1);
+    --icon-bg: rgba(255, 255, 255, 0.1);
+    --icon-shadow: rgba(0, 0, 0, 0.15);
+    --tooltip-bg: rgba(0, 0, 0, 0.9);
+    --tooltip-text: #ffffff;
+    --input-bg: rgba(255, 255, 255, 0.6);
+    --input-text: #1a1a2e;
+    --input-border: rgba(0, 0, 0, 0.12);
+    --accent-primary: #667eea;
+    --accent-secondary: #764ba2;
+    --glass-blur: 10px;
+    --glass-blur-strong: 20px;
+    --wallpaper-overlay: rgba(0, 0, 0, 0.3);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
