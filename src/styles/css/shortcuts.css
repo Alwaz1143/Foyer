@@ -100,7 +100,7 @@
 .shortcut-item:hover .shortcut-icon {
     box-shadow: 0 12px 32px var(--icon-shadow);
     border-color: var(--accent-primary);
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--icon-bg-hover);
 }
 
 .shortcut-item:hover .shortcut-icon::before {
@@ -130,6 +130,8 @@
     white-space: nowrap;
     pointer-events: none;
     line-height: 1.2;
+    /* Subtle shadow helps on both light and wallpaper backgrounds */
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 /* Ensure menu-open item is above other elements */
@@ -173,7 +175,7 @@
     border-radius: 6px;
     cursor: pointer;
     font-size: 13px;
-    color: var(--text-color);
+    color: #1a1a2e;
     text-align: left;
     transition: background 0.15s ease;
     white-space: nowrap;

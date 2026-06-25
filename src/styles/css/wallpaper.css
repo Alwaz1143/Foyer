@@ -42,12 +42,13 @@ body.wallpaper-active::before {
   height: 100dvh !important;
 }
 
-/* Adjust card backgrounds when wallpaper is active */
+/* Adjust card backgrounds when wallpaper is active — glassmorphic effect */
 body.wallpaper-active .widget,
 body.wallpaper-active .category-section {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 /* Photo Credit */

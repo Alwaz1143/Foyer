@@ -67,7 +67,7 @@
 
 .data-btn:hover {
     transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.9);
     border-color: var(--accent-primary);
     box-shadow: 0 6px 16px rgba(102, 126, 234, 0.25);
 }
@@ -138,11 +138,11 @@
 }
 
 .btn-secondary {
-    background: var(--input-bg);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 2px solid var(--card-border);
-    color: var(--text-color);
+    color: #1a1a2e;
 }
 
 .btn-secondary:hover {
@@ -152,6 +152,17 @@
     box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
 }
 
-.btn-secondary:active {
-    transform: translateY(0);
+/* Wallpaper-active: data-btn and section-actions buttons float on dark wallpaper */
+body.wallpaper-active .data-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
+
+body.wallpaper-active .data-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #ffffff;
+}
+

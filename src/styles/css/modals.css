@@ -51,14 +51,14 @@
 .modal-header h2 {
     margin: 0;
     font-size: var(--font-size-xl, 24px);
-    color: var(--text-color);
+    color: #1a1a2e;
 }
 
 .close-btn {
     background: none;
     border: none;
     font-size: clamp(24px, 6vw, 32px);
-    color: var(--text-color);
+    color: #1a1a2e;
     cursor: pointer;
     width: var(--touch-target-min, 44px);
     height: var(--touch-target-min, 44px);
@@ -89,7 +89,7 @@
     display: block;
     margin-bottom: var(--spacing-xs, 8px);
     font-weight: 600;
-    color: var(--text-color);
+    color: #1a1a2e;
     font-size: var(--font-size-sm, 14px);
 }
 

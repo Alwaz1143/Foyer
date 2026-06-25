@@ -5,12 +5,12 @@
 :root {
     --bg-color: #f5f7fa;
     --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    /* --text-color: #1a1a2e; */
-    --text-color: #fff;
+    --text-color: #1a1a2e;          /* Dark navy — readable on light/white surfaces */
     --card-bg: rgb(255, 255, 255);
     --card-border: rgba(0, 0, 0, 0.08);
     --card-shadow: rgba(0, 0, 0, 0.1);
-    --icon-bg: rgba(255, 255, 255, 0.1);
+    --icon-bg: rgba(255, 255, 255, 0.85);     /* Visible icon box on light background */
+    --icon-bg-hover: rgba(255, 255, 255, 0.95);
     --icon-shadow: rgba(0, 0, 0, 0.15);
     --tooltip-bg: rgba(0, 0, 0, 0.9);
     --tooltip-text: #ffffff;
@@ -24,6 +24,19 @@
     --wallpaper-overlay: rgba(0, 0, 0, 0.3);
 }
 
+/* When wallpaper is active, the widget/section glass has very low white opacity (0.1)
+   so text INSIDE those glass panels must be white. Elements in solid-white modals/dropdowns
+   keep their own explicit dark color rules and are unaffected. */
+body.wallpaper-active .widget,
+body.wallpaper-active .category-section {
+    --text-color: #ffffff;
+    --card-border: rgba(255, 255, 255, 0.18);
+    --input-border: rgba(255, 255, 255, 0.22);
+    --input-bg: rgba(255, 255, 255, 0.12);
+    --icon-bg: rgba(255, 255, 255, 0.12);
+    --icon-bg-hover: rgba(255, 255, 255, 0.2);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -32,4 +45,5 @@
 
 html {
     scroll-behavior: smooth;
+    color-scheme: light dark;
 }

@@ -15,7 +15,7 @@
 
 /* Category Sections - Static Tiles */
 .category-section {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.75);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--card-border);
@@ -27,9 +27,6 @@
     min-height: fit-content;
     position: relative;
     animation: sectionFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-
-    background: rgba(255, 255, 255, 0.1) !important;
-    backdrop-filter: blur(3px) !important;
 }
 
 .category-section:nth-child(1) { animation-delay: 0.05s; opacity: 0; }
@@ -110,6 +107,7 @@
     font-weight: 700;
     margin: 0;
     color: var(--text-color);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .category-count {
@@ -131,6 +129,7 @@
     padding: 4px;
     border-radius: 8px;
     transition: background 0.2s ease, transform 0.2s ease;
+    opacity: 0.65;
 }
 
 .section-edit-btn:hover {
