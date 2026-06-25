@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,7 @@ import { useSearch } from "@/hooks/useSearch";
 import { useCategories } from "@/contexts/CategoriesContext";
 import { UNSPLASH_CONFIG } from "@/lib/constants";
 import { showToast } from "@/lib/toast";
+import { foyerKey } from "@/lib/storage";
 import ShortcutGrid from "@/components/ShortcutGrid";
 
 
@@ -19,8 +20,10 @@ function closeModal(id: string) {
 }
 
 export default function HomePage() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const router = useRouter();
+  const uidRef = useRef<string | null>(null);
+  uidRef.current = user?.uid ?? null;
   const { toggleWallpaper } = useWallpaper();
   const { connected, startOAuth } = useUnsplash();
   useSearch();
@@ -67,7 +70,7 @@ export default function HomePage() {
       document.removeEventListener("click", closeShortcutMenus);
       window.removeEventListener("click", closeModals);
     };
-  }, [signOut, router, toggleWallpaper, startOAuth]);
+  }, [signOut, router, toggleWallpaper]);
 
   // Settings modal
   useEffect(() => {
@@ -80,10 +83,13 @@ export default function HomePage() {
     const handleOpenSettings = () => {
       document.getElementById("userMenu")?.classList.remove("show");
       if (wallpaperKeywords) {
-        let kw = localStorage.getItem("customWallpaperKeywords");
+        const uid = uidRef.current;
+        let kw =
+          localStorage.getItem(foyerKey("customWallpaperKeywords", uid)) ||
+          localStorage.getItem("customWallpaperKeywords");
         if (!kw) {
           kw = UNSPLASH_CONFIG.query;
-          localStorage.setItem("customWallpaperKeywords", kw);
+          localStorage.setItem(foyerKey("customWallpaperKeywords", uid), kw);
         }
         wallpaperKeywords.value = kw;
       }
@@ -94,7 +100,10 @@ export default function HomePage() {
     const handleCancelSettings = () => closeModal("settingsModal");
     const handleSettingsSubmit = (e: Event) => {
       e.preventDefault();
-      if (wallpaperKeywords) localStorage.setItem("customWallpaperKeywords", wallpaperKeywords.value);
+      if (wallpaperKeywords) {
+        const uid = uidRef.current;
+        localStorage.setItem(foyerKey("customWallpaperKeywords", uid), wallpaperKeywords.value);
+      }
       closeModal("settingsModal");
       showToast("Settings saved!");
     };

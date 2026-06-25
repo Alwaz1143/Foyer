@@ -3,7 +3,8 @@
 import { useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { doc, writeBatch } from "firebase/firestore";
+import { foyerKey } from "@/lib/storage";
 import type { Category } from "@/lib/types";
 
 export function useFirestoreSync() {
@@ -64,12 +65,18 @@ export function useFirestoreSync() {
         knownSiteIds.current.set(cat.id, curSiteIds);
       });
 
+      // Read settings with scoped key first, fall back to legacy unscoped key
+      const getLocal = (key: string) =>
+        localStorage.getItem(foyerKey(key, uid)) ??
+        localStorage.getItem(key) ??
+        null;
+
       batch.set(doc(db, "users", uid), {
         settings: {
-          wallpaperEnabled: localStorage.getItem("wallpaperEnabled") !== "false",
-          selectedSearchEngine: localStorage.getItem("selectedSearchEngine") || "google",
-          lastWallpaperKeyword: localStorage.getItem("lastWallpaperKeyword") || "",
-          customWallpaperKeywords: localStorage.getItem("customWallpaperKeywords") || "",
+          wallpaperEnabled: getLocal("wallpaperEnabled") !== "false",
+          selectedSearchEngine: getLocal("selectedSearchEngine") || "google",
+          lastWallpaperKeyword: getLocal("lastWallpaperKeyword") || "",
+          customWallpaperKeywords: getLocal("customWallpaperKeywords") || "",
         },
       }, { merge: true });
 

@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
+import { foyerKey } from "@/lib/storage";
 import "@/styles/css/auth.css";
 
 function CallbackInner() {
@@ -67,7 +68,7 @@ function CallbackInner() {
           { merge: true }
         );
 
-        localStorage.setItem("unsplash_connection", JSON.stringify({
+        localStorage.setItem(foyerKey("unsplash_connection", user.uid), JSON.stringify({
           accessToken: data.accessToken,
           username: data.username,
           foyerCollectionId: data.foyerCollectionId,

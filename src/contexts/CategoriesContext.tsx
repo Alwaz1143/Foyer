@@ -1,12 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, collection as fsCollection, getDocs } from "firebase/firestore";
 import { useFirestoreSync } from "@/hooks/useFirestoreSync";
 import { defaultCategories } from "@/lib/defaults";
 import { generateSiteId, generateCategoryId, getRootDomain } from "@/lib/utils";
+import { foyerKey } from "@/lib/storage";
 import type { Category, Website } from "@/lib/types";
 
 interface CategoriesContextValue {
@@ -32,10 +33,16 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { scheduleSync, forceSync, initKnownIds } = useFirestoreSync();
 
+  const prevUidRef = useRef<string | null>(null);
+  const uidRef = useRef<string | null>(null);
+  uidRef.current = user?.uid || null;
+
   // Client-only: restore from localStorage immediately on mount
   useEffect(() => {
     try {
-      const local = localStorage.getItem("categories");
+      const uid = user?.uid;
+      const key = foyerKey("categories", uid);
+      const local = localStorage.getItem(key) || localStorage.getItem("categories");
       if (local) {
         const parsed = JSON.parse(local);
         if (Array.isArray(parsed)) parsed.forEach((c: any) => { if (!c.websites) c.websites = []; });
@@ -43,18 +50,23 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync with Firestore on mount / auth change
   useEffect(() => {
     if (!user) return;
     const uid = user.uid;
 
-    const cached = localStorage.getItem("categories");
+    if (prevUidRef.current !== null && prevUidRef.current !== uid) {
+      setCategories([]);
+      setLoading(true);
+    }
+    prevUidRef.current = uid;
 
     (async () => {
       try {
         const catsSnap = await getDocs(fsCollection(db, "users", uid, "categories"));
+        const catKey = foyerKey("categories", uid);
         if (!catsSnap.empty) {
           const sortedCats = catsSnap.docs
             .sort((a, b) => (a.data().orderIndex ?? 999) - (b.data().orderIndex ?? 999))
@@ -68,26 +80,25 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
             loaded.push({ id: cat.id, name: cat.name, icon: cat.icon || "", websites: sortedSites });
           }
           setCategories(loaded);
-          localStorage.setItem("categories", JSON.stringify(loaded));
+          localStorage.setItem(catKey, JSON.stringify(loaded));
           initKnownIds(loaded);
-        } else if (!cached) {
-          // First visit — Firestore empty, use defaults
+        } else {
+          // First visit for this user — Firestore empty, use defaults
           const data: Category[] = JSON.parse(JSON.stringify(defaultCategories));
           data.forEach((c) => c.websites.forEach((s) => { if (!s.id) s.id = generateSiteId(); }));
           setCategories(data);
-          localStorage.setItem("categories", JSON.stringify(data));
+          localStorage.setItem(catKey, JSON.stringify(data));
           initKnownIds(data);
           await forceSync(data);
         }
       } catch (err) {
-        if (!cached) {
-          console.error("Firestore load failed, falling back to localStorage:", err);
-          const local = localStorage.getItem("categories");
-          if (local) {
-            setCategories(JSON.parse(local));
-          } else {
-            setCategories(JSON.parse(JSON.stringify(defaultCategories)));
-          }
+        console.error("Firestore load failed, falling back to localStorage:", err);
+        const catKey = foyerKey("categories", uid);
+        const local = localStorage.getItem(catKey) || localStorage.getItem("categories");
+        if (local) {
+          setCategories(JSON.parse(local));
+        } else {
+          setCategories(JSON.parse(JSON.stringify(defaultCategories)));
         }
       }
       setLoading(false);
@@ -96,7 +107,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback((newCats: Category[]) => {
     setCategories(newCats);
-    localStorage.setItem("categories", JSON.stringify(newCats));
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(newCats));
     scheduleSync(newCats);
   }, [scheduleSync]);
 
@@ -107,7 +118,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       if (!cat) return prev;
       const domain = getRootDomain(url);
       cat.websites.push({ id: generateSiteId(), name, url, domain, customIcon: customIcon || "" });
-      localStorage.setItem("categories", JSON.stringify(next));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
       scheduleSync(next);
       return next;
     });
@@ -117,7 +128,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     setCategories((prev) => {
       const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
       Object.assign(next[catIndex].websites[siteIndex], updates);
-      localStorage.setItem("categories", JSON.stringify(next));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
       scheduleSync(next);
       return next;
     });
@@ -127,7 +138,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     setCategories((prev) => {
       const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
       next[catIndex].websites.splice(siteIndex, 1);
-      localStorage.setItem("categories", JSON.stringify(next));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
       scheduleSync(next);
       return next;
     });
@@ -139,7 +150,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       const [site] = next[fromCatIdx].websites.splice(fromSiteIdx, 1);
       const adjustedIdx = fromCatIdx === toCatIdx && fromSiteIdx < toSiteIdx ? toSiteIdx - 1 : toSiteIdx;
       next[toCatIdx].websites.splice(adjustedIdx, 0, site);
-      localStorage.setItem("categories", JSON.stringify(next));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
       scheduleSync(next);
       return next;
     });
@@ -150,7 +161,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       const existingIds = new Set(prev.map((c) => c.id));
       const newCat: Category = { id: generateCategoryId(name, existingIds), name, icon: icon || name.charAt(0).toUpperCase() || "📁", websites: [] };
       const next = [...prev, newCat];
-      localStorage.setItem("categories", JSON.stringify(next));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
       scheduleSync(next);
       return next;
     });
@@ -160,7 +171,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     setCategories((prev) => {
       const next = [...prev];
       next[catIndex] = { ...next[catIndex], name, icon };
-      localStorage.setItem("categories", JSON.stringify(next));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
       scheduleSync(next);
       return next;
     });
@@ -169,7 +180,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   const deleteCategory = useCallback((catIndex: number) => {
     setCategories((prev) => {
       const next = prev.filter((_, i) => i !== catIndex);
-      localStorage.setItem("categories", JSON.stringify(next));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
       scheduleSync(next);
       return next;
     });
@@ -180,7 +191,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       const next = [...prev];
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
-      localStorage.setItem("categories", JSON.stringify(next));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
       scheduleSync(next);
       return next;
     });
@@ -188,14 +199,14 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
   const replaceAll = useCallback((newCats: Category[]) => {
     setCategories(newCats);
-    localStorage.setItem("categories", JSON.stringify(newCats));
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(newCats));
     forceSync(newCats);
   }, [forceSync]);
 
   const save = useCallback(() => {
     setCategories((prev) => {
       scheduleSync(prev);
-      localStorage.setItem("categories", JSON.stringify(prev));
+      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(prev));
       return prev;
     });
   }, [scheduleSync]);

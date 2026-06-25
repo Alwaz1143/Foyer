@@ -1,25 +1,50 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { UNSPLASH_CONFIG, WALLPAPER_CACHE_KEY } from "@/lib/constants";
+import { foyerKey } from "@/lib/storage";
 import type { CachedWallpaper } from "@/lib/types";
 
 export function useWallpaper() {
-  const [enabled, setEnabled] = useState(() =>
-    typeof window !== "undefined" ? localStorage.getItem("wallpaperEnabled") !== "false" : true
-  );
+  const { user } = useAuth();
+  const uidRef = useRef<string | null>(null);
+  uidRef.current = user?.uid ?? null;
+
+  const getEnabled = useCallback(() => {
+    if (typeof window === "undefined") return true;
+    const uid = uidRef.current;
+    // Try scoped key first, fall back to legacy unscoped key for existing users
+    const scoped = localStorage.getItem(foyerKey("wallpaperEnabled", uid));
+    if (scoped !== null) return scoped !== "false";
+    const legacy = localStorage.getItem("wallpaperEnabled");
+    return legacy !== "false";
+  }, []);
+
+  const [enabled, setEnabled] = useState(() => getEnabled());
   const [photo, setPhoto] = useState<CachedWallpaper | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Re-read settings when user changes (sign-out / sign-in)
+  useEffect(() => {
+    setEnabled(getEnabled());
+  }, [user, getEnabled]);
+
   const getRandomKeyword = useCallback(() => {
-    const custom = localStorage.getItem("customWallpaperKeywords");
+    const uid = uidRef.current;
+    const custom =
+      localStorage.getItem(foyerKey("customWallpaperKeywords", uid)) ||
+      localStorage.getItem("customWallpaperKeywords");
     const source = custom || UNSPLASH_CONFIG.query;
     const keywords = source.split(",").map((k) => k.trim()).filter(Boolean);
-    const lastKeyword = localStorage.getItem("lastWallpaperKeyword") || "";
+    const lastKeyword =
+      localStorage.getItem(foyerKey("lastWallpaperKeyword", uid)) ||
+      localStorage.getItem("lastWallpaperKeyword") ||
+      "";
     if (keywords.length <= 1) return keywords[0] || "nature";
     const available = keywords.filter((k) => k.toLowerCase() !== lastKeyword.toLowerCase());
     const selected = available[Math.floor(Math.random() * available.length)] || keywords[0];
-    localStorage.setItem("lastWallpaperKeyword", selected);
+    localStorage.setItem(foyerKey("lastWallpaperKeyword", uid), selected);
     return selected;
   }, []);
 
@@ -45,7 +70,12 @@ export function useWallpaper() {
       ilink.href = photoData.photoUrl;
       ilink.classList.remove("heart-liked");
       try {
-        const liked = JSON.parse(localStorage.getItem("unsplash_liked_photos") || "[]");
+        const uid = uidRef.current;
+        const liked = JSON.parse(
+          localStorage.getItem(foyerKey("unsplash_liked_photos", uid)) ||
+          localStorage.getItem("unsplash_liked_photos") ||
+          "[]"
+        );
         if (liked.includes(photoData.id)) ilink.classList.add("heart-liked");
       } catch { /* ignore */ }
     }
@@ -103,9 +133,10 @@ export function useWallpaper() {
   }, [getRandomKeyword, applyPhoto]);
 
   const toggleWallpaper = useCallback(() => {
+    const uid = uidRef.current;
     if (!enabled) {
       setEnabled(true);
-      localStorage.setItem("wallpaperEnabled", "true");
+      localStorage.setItem(foyerKey("wallpaperEnabled", uid), "true");
       const toggle = document.getElementById("wallpaperToggle");
       toggle?.classList.remove("disabled");
     }
@@ -128,7 +159,7 @@ export function useWallpaper() {
     } else {
       disableWallpaper();
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     enabled,

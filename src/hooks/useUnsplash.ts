@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { foyerKey } from "@/lib/storage";
 import { showToast } from "@/lib/toast";
 
 export function useUnsplash() {
   const { user } = useAuth();
+  const uidRef = useRef<string | null>(null);
+  uidRef.current = user?.uid ?? null;
+
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [collectionId, setCollectionId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
@@ -16,10 +20,18 @@ export function useUnsplash() {
 
   const clientId = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY || "";
 
-  // Restore Unsplash connection from localStorage (bypasses ad-blocker)
+  // Restore Unsplash connection from localStorage (scoped per-user, bypasses ad-blocker)
   useEffect(() => {
+    const uid = user?.uid;
+    // Clear state first so previous user's connection isn't shown
+    setAccessToken(null);
+    setCollectionId(null);
+    setUsername(null);
+    setConnected(false);
     try {
-      const stored = localStorage.getItem("unsplash_connection");
+      const stored =
+        localStorage.getItem(foyerKey("unsplash_connection", uid)) ||
+        (!uid ? localStorage.getItem("unsplash_connection") : null);
       if (stored) {
         const data = JSON.parse(stored);
         setAccessToken(data.accessToken);
@@ -28,7 +40,7 @@ export function useUnsplash() {
         setConnected(true);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [user]); // re-run on every user change
 
   // Load Unsplash state from Firestore
   useEffect(() => {
@@ -42,7 +54,7 @@ export function useUnsplash() {
           setCollectionId(data.foyerCollectionId || null);
           setUsername(data.username || null);
           setConnected(true);
-          localStorage.setItem("unsplash_connection", JSON.stringify(data));
+          localStorage.setItem(foyerKey("unsplash_connection", user.uid), JSON.stringify(data));
         }
       } catch (e) {
         console.warn("Could not load Unsplash state:", e);
@@ -106,10 +118,16 @@ export function useUnsplash() {
       if (res.ok || res.status === 422) {
         imageLink?.classList.add("heart-liked");
         try {
-          const liked = JSON.parse(localStorage.getItem("unsplash_liked_photos") || "[]");
+          const uid = uidRef.current;
+          const likedKey = foyerKey("unsplash_liked_photos", uid);
+          const liked = JSON.parse(
+            localStorage.getItem(likedKey) ||
+            localStorage.getItem("unsplash_liked_photos") ||
+            "[]"
+          );
           if (!liked.includes(photoId)) {
             liked.push(photoId);
-            localStorage.setItem("unsplash_liked_photos", JSON.stringify(liked));
+            localStorage.setItem(likedKey, JSON.stringify(liked));
           }
         } catch { /* ignore */ }
         showToast("Added to your Foyer collection on Unsplash \uD83D\uDC9B");
