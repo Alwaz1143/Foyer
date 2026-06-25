@@ -63,6 +63,47 @@ export function useUnsplash() {
     load();
   }, [user]);
 
+  /**
+   * Recomputes and applies the heart button color based on:
+   * - whether the user is connected to Unsplash
+   * - whether the current photo is in the user's liked list
+   * Always call this after: photo change, connected change, user change, successful add.
+   */
+  const refreshHeart = useCallback(() => {
+    const ilink = document.getElementById("imageLink");
+    if (!ilink) return;
+    const photoId = (window as any).currentUnsplashPhotoId as string | undefined;
+
+    // Always reset to default (white) first
+    ilink.classList.remove("heart-liked");
+
+    // Not connected → always white, CSS hover handles the red-on-hover only
+    if (!connected || !photoId) return;
+
+    // Connected → check if this photo is in the liked list
+    try {
+      const uid = uidRef.current;
+      const liked: string[] = JSON.parse(
+        localStorage.getItem(foyerKey("unsplash_liked_photos", uid)) ||
+        localStorage.getItem("unsplash_liked_photos") ||
+        "[]"
+      );
+      if (liked.includes(photoId)) ilink.classList.add("heart-liked");
+    } catch { /* ignore */ }
+  }, [connected]);
+
+  // Re-evaluate heart whenever connected state changes (including on user switch)
+  useEffect(() => {
+    refreshHeart();
+  }, [refreshHeart]);
+
+  // Re-evaluate heart whenever a new photo is applied (fired by useWallpaper.applyPhoto)
+  useEffect(() => {
+    const handler = () => refreshHeart();
+    window.addEventListener("foyer:photochange", handler);
+    return () => window.removeEventListener("foyer:photochange", handler);
+  }, [refreshHeart]);
+
   // Start Unsplash OAuth
   const startOAuth = useCallback(() => {
     if (!clientId || clientId === "YOUR_UNSPLASH_CLIENT_ID") {
@@ -116,11 +157,11 @@ export function useUnsplash() {
       });
 
       if (res.ok || res.status === 422) {
-        imageLink?.classList.add("heart-liked");
+        // Save to liked list
         try {
           const uid = uidRef.current;
           const likedKey = foyerKey("unsplash_liked_photos", uid);
-          const liked = JSON.parse(
+          const liked: string[] = JSON.parse(
             localStorage.getItem(likedKey) ||
             localStorage.getItem("unsplash_liked_photos") ||
             "[]"
@@ -130,7 +171,9 @@ export function useUnsplash() {
             localStorage.setItem(likedKey, JSON.stringify(liked));
           }
         } catch { /* ignore */ }
-        showToast("Added to your Foyer collection on Unsplash \uD83D\uDC9B");
+        // Immediately reflect the red heart
+        refreshHeart();
+        showToast("Added to your Foyer collection on Unsplash 💛");
         return true;
       }
       throw new Error(`API error ${res.status}`);
@@ -141,9 +184,9 @@ export function useUnsplash() {
     } finally {
       imageLink?.classList.remove("heart-loading");
     }
-  }, [accessToken, collectionId, user]);
+  }, [accessToken, collectionId, user, refreshHeart]);
 
-  // Wire up heart button and unsplash popup
+  // Wire up heart button click and unsplash popup
   useEffect(() => {
     const imageLink = document.getElementById("imageLink");
     const popup = document.getElementById("unsplashPopup");

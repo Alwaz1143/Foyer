@@ -69,18 +69,11 @@ export function useWallpaper() {
     if (ilink) {
       ilink.href = photoData.photoUrl;
       ilink.classList.remove("heart-liked");
-      try {
-        const uid = uidRef.current;
-        const liked = JSON.parse(
-          localStorage.getItem(foyerKey("unsplash_liked_photos", uid)) ||
-          localStorage.getItem("unsplash_liked_photos") ||
-          "[]"
-        );
-        if (liked.includes(photoData.id)) ilink.classList.add("heart-liked");
-      } catch { /* ignore */ }
     }
     (window as any).currentUnsplashPhotoId = photoData.id;
     (window as any).currentUnsplashPhotoUrl = photoData.photoUrl;
+    // Notify useUnsplash to re-evaluate heart state for this photo
+    window.dispatchEvent(new CustomEvent("foyer:photochange", { detail: { photoId: photoData.id } }));
     if (highResUrl) {
       const img = new Image();
       img.decoding = "async";
