@@ -10,11 +10,11 @@
     border-radius: 20px;
 }
 
-.widget-input:focus-visible,
+/* .widget-input:focus-visible,
 .form-group input:focus-visible {
     outline: 3px solid var(--accent-primary);
     outline-offset: 2px;
-}
+} */
 
 .btn-primary:focus-visible,
 .btn-secondary:focus-visible {
