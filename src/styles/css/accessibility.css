@@ -10,12 +10,6 @@
     border-radius: 20px;
 }
 
-.delete-btn:focus-visible,
-.edit-btn:focus-visible {
-    outline: 3px solid var(--accent-primary);
-    outline-offset: 2px;
-}
-
 .widget-input:focus-visible,
 .form-group input:focus-visible {
     outline: 3px solid var(--accent-primary);

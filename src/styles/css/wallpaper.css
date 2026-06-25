@@ -264,47 +264,6 @@ body.wallpaper-active .category-section {
   background: rgba(30, 10, 10, 0.92);
 }
 
-/* Wallpaper Toggle */
-/* .wallpaper-toggle {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: none !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    cursor: pointer;
-    padding: 8px;
-    font-size: 24px;
-    color: #764ba2;
-    opacity: 0.8;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    z-index: 1000;
-    outline: none;
-}
-
-.wallpaper-toggle:hover {
-    opacity: 1;
-    transform: scale(1.1);
-    background: none !important;
-}
-
-.wallpaper-toggle:focus,
-.wallpaper-toggle:focus-visible {
-    outline: none;
-    background: none !important;
-}
-
-.wallpaper-toggle:active {
-    transform: scale(0.95);
-    background: none !important;
-}
-
-.wallpaper-toggle.disabled {
-    opacity: 0.3;
-} */
-
 /* =============================================== */
 /* Unsplash Photo Credit Container */
 .photo-credit {

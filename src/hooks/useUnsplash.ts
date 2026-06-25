@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { showToast } from "@/lib/toast";
 
 export function useUnsplash() {
   const { user } = useAuth();
@@ -53,7 +54,7 @@ export function useUnsplash() {
   // Start Unsplash OAuth
   const startOAuth = useCallback(() => {
     if (!clientId || clientId === "YOUR_UNSPLASH_CLIENT_ID") {
-      alert("Unsplash is not configured yet.");
+      showToast("Unsplash is not configured yet.", "error");
       return;
     }
     const redirectUri = `${window.location.origin}/unsplash-callback`;
@@ -167,13 +168,4 @@ export function useUnsplash() {
   }, [connected, addToCollection, startOAuth]);
 
   return { connected, username, loading, startOAuth };
-}
-
-// Inline toast for now (avoids circular deps)
-function showToast(message: string, type: "success" | "error" = "success") {
-  const toast = document.getElementById("foyerToast");
-  if (!toast) return;
-  toast.textContent = message;
-  toast.className = `foyer-toast foyer-toast--${type} show`;
-  setTimeout(() => toast.classList.remove("show"), 3000);
 }

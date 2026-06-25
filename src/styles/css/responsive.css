@@ -345,15 +345,6 @@
     }
 }
 
-/* Very small screens */
-@media (max-width: 767px) {
-    .shortcuts-grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
-        padding: 12px;
-    }
-}
-
 /* Touch device optimizations */
 @media (hover: none) and (pointer: coarse) {
     .menu-option {

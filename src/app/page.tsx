@@ -9,15 +9,9 @@ import { useUnsplash } from "@/hooks/useUnsplash";
 import { useSearch } from "@/hooks/useSearch";
 import { useCategories } from "@/contexts/CategoriesContext";
 import { UNSPLASH_CONFIG } from "@/lib/constants";
+import { showToast } from "@/lib/toast";
 import ShortcutGrid from "@/components/ShortcutGrid";
 
-function showToast(msg: string, type = "success") {
-  const toast = document.getElementById("foyerToast");
-  if (!toast) return;
-  toast.textContent = msg;
-  toast.className = `foyer-toast foyer-toast--${type} show`;
-  setTimeout(() => toast.classList.remove("show"), 3000);
-}
 
 function closeModal(id: string) {
   const m = document.getElementById(id);

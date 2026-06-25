@@ -1,63 +1,68 @@
-# Foyer 🚪
+# Foyer
 
-**Foyer** is a fully customizable, personal browser homepage (new-tab replacement) built with vanilla web technologies and backed by Firebase and Cloudflare. It features a drag-and-drop shortcut grid, a unified search widget, and seamless Unsplash integration to sync your favorite wallpapers directly to your Unsplash account.
+A fully customizable personal browser homepage (new-tab replacement) built with Next.js 15, Firebase, and TypeScript. Features a drag-and-drop shortcut grid, a unified search widget, and Unsplash wallpaper integration.
 
----
+## Features
 
-## ✨ Features
+- **Cloud Sync & Auth** — Firebase Authentication (Email/Password + Google Sign-In). Categories and shortcuts sync across devices via Cloud Firestore.
+- **Custom Shortcuts** — Organize websites into categories with a 5-level fallback chain for high-quality favicons.
+- **Drag & Drop** — Native HTML5 drag-and-drop to reorder shortcuts and entire category sections.
+- **Unified Search** — Search across Google, YouTube, Perplexity, X, Reddit, and Wikipedia. Saves per-engine search history locally.
+- **Dynamic Wallpapers** — Integrates with the Unsplash API for beautiful rotating background imagery based on configurable keywords.
+- **Unsplash Account Linking** — Secure OAuth 2.0 to connect your Unsplash account. Click the heart button to save wallpapers to a "Foyer" collection on your profile.
+- **Data Portability** — Export and import your entire setup as a JSON file.
+- **Right-click & Long-press Menus** — Desktop right-click and mobile long-press for edit/delete actions.
 
-* **☁️ Cloud Sync & Auth:** Firebase Authentication (Email/Password + Google Sign-In) ensures your setup syncs across all your devices in real-time via Cloud Firestore.
-* **🗂️ Custom Shortcuts:** Organize your most-used websites into categories. Features a 5-level fallback chain for high-quality favicons.
-* **🖱️ Drag & Drop:** Native HTML5 drag-and-drop to reorder individual shortcut cards or entire category sections.
-* **🔍 Unified Search:** Search across Google, YouTube, Perplexity, X, Reddit, and Wikipedia from a single widget. Saves per-engine search history locally.
-* **🖼️ Dynamic Wallpapers:** Integrates with the Unsplash API for beautiful, rotating background imagery based on dynamic keywords.
-* **❤️ Unsplash Account Linking:** Secure OAuth 2.0 integration allows you to connect your personal Unsplash account. Clicking the ♥ button automatically creates a "Foyer" collection on your profile and saves the current wallpaper.
-* **💾 Data Portability:** Export your entire setup as a JSON file and import it anywhere as a backup.
+## Tech Stack
 
----
+- **Framework:** Next.js 15 (App Router), React 19, TypeScript
+- **State:** React Context (CategoriesContext), localStorage-first with Firestore sync
+- **Backend / BaaS:** Firebase v10 (Auth, Firestore)
+- **API Routes:** Next.js API route for Unsplash OAuth token exchange (server-side, secret stays hidden)
+- **Styling:** Modular CSS (variables, glassmorphism, animations)
+- **Deployment:** Vercel (static + serverless functions)
+- **Dependencies:** `firebase`, `@fortawesome/fontawesome-free`, `@next/font`
 
-## 🛠️ Tech Stack
+## Architecture
 
-* **Frontend:** Vanilla JavaScript (ES Modules), HTML5, CSS3 (Glassmorphism design system).
-* **Backend / BaaS:** Firebase v10 (Auth, Firestore, Hosting).
-* **Edge Proxy:** Cloudflare Workers (Handles Unsplash OAuth token exchange securely, keeping the API secret hidden from the browser).
+```
+src/
+├── app/
+│   ├── page.tsx                    Main dashboard (UI shell + imperative wiring)
+│   ├── login/page.tsx              Auth screen
+│   ├── unsplash-callback/page.tsx  OAuth redirect handler
+│   ├── not-found.tsx               404 page
+│   └── api/unsplash-exchange/      Server-side token exchange
+├── components/
+│   ├── AuthGuard.tsx               Auth wrapper with avatar fallback
+│   ├── CategorySection.tsx         Section header + grid wrapper
+│   ├── ShortcutCard.tsx            Favicon fallback + context menu
+│   └── ShortcutGrid.tsx            Grid container with DnD wiring
+├── contexts/
+│   └── CategoriesContext.tsx       CRUD with localStorage → Firestore sync
+├── hooks/
+│   ├── useUnsplash.ts              OAuth, connection state, photo liking
+│   └── useWallpaper.ts             Keyword rotation, photo application
+├── lib/
+│   ├── firebase.ts                 Firebase SDK init
+│   ├── schema.ts                   TypeScript types
+│   ├── constants.ts                Default config values
+│   ├── defaults.ts                 Default categories
+│   ├── utils.ts                    Utility functions
+│   └── toast.ts                    Shared toast notification
+└── styles/
+    └── css/                        Modular CSS files (6 stylesheets)
+```
 
----
+## Database Schema (Firestore)
 
-## 🏗️ Architecture & File Structure
-
-| Directory / File | Purpose |
-| --- | --- |
-| `index.html` | The main single-page application and UI shell. |
-| `login.html` | Authentication screen (Email/Password & Google Sign-In). |
-| `unsplash-callback.html` | Handles the OAuth redirect from Unsplash and communicates with the Worker. |
-| `script.js` | Core business logic (UI rendering, Drag & Drop, Search, Firestore sync). |
-| `firebase-config.js` | Initializes the Firebase v10 SDK using credentials from `config.js`. |
-| `firebase-auth-guard.js` | Route protection, ensuring only authenticated users can view the dashboard. |
-| `css/` | Modular CSS (variables, base, wallpaper, widgets, shortcuts, modals, animations, responsive). |
-| `cloudflare-worker/` | Contains `worker.js` for the Cloudflare Edge server handling Unsplash OAuth. |
-
----
-
-## 🗄️ Database Schema (Firestore)
-
-Foyer utilizes a NoSQL document/collection hierarchy to minimize read/write costs and ensure fast loading.
-
-```text
+```
 users/{userId}
   ├── email: string
   ├── displayName: string
   ├── photoURL: string
-  ├── settings: {
-  │     wallpaperEnabled: boolean,
-  │     lastWallpaperKeyword: string,
-  │     selectedSearchEngine: string
-  │   }
-  └── unsplash: {
-        accessToken: string,
-        username: string,
-        foyerCollectionId: string
-      }
+  ├── settings: { wallpaperEnabled, lastWallpaperKeyword, selectedSearchEngine }
+  └── unsplash: { accessToken, username, foyerCollectionId }
 
 users/{userId}/categories/{categoryId}
   ├── name: string
@@ -70,45 +75,74 @@ users/{userId}/categories/{categoryId}/websites/{websiteId}
   ├── domain: string
   ├── customIcon: string
   └── orderIndex: number
-
 ```
 
----
+## Local Setup
 
-## 🚀 Local Setup & Deployment
+### 1. Clone & Install
 
-### 1. Repository Setup
-
-1. Clone the repository: `git clone https://github.com/yourusername/foyer.git`
-2. Navigate to the project directory: `cd foyer`
-3. Duplicate `config.example.js` and rename it to `config.js`.
+```bash
+git clone https://github.com/yourusername/foyer.git
+cd foyer
+npm install
+```
 
 ### 2. Firebase Configuration
 
-1. Go to the [Firebase Console](https://console.firebase.google.com) and create a free project (Spark Plan).
-2. Enable **Authentication** (Google & Email/Password providers).
-3. Enable **Firestore Database** and update the security rules to ensure users can only read/write their own data.
-4. Copy your Firebase Web App configuration into `config.js`.
+1. Go to the [Firebase Console](https://console.firebase.google.com) and create a project (Spark Plan).
+2. Enable **Authentication** (Google + Email/Password).
+3. Enable **Firestore Database** with user-scoped security rules.
+4. Create a `.env.local` file with your Firebase Web App config:
 
-### 3. Unsplash & Cloudflare Worker Setup
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+NEXT_PUBLIC_FIREBASE_APP_ID=...
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=...
+```
 
-Because single-page applications cannot safely store API secrets, Foyer uses a Cloudflare Worker to handle the OAuth token exchange.
+### 3. Unsplash Configuration
 
-1. Create an app in the [Unsplash Developer Portal](https://unsplash.com/developers) and enable the `public`, `write_likes`, and `write_collections` scopes.
-2. Add your Unsplash **Access Key** to `config.js`.
-3. Open your terminal and navigate to the worker directory: `cd cloudflare-worker`
-4. Log into Cloudflare: `npx wrangler login`
-5. Securely store your Unsplash keys in the worker's environment:
-* `npx wrangler secret put UNSPLASH_CLIENT_ID` (Paste Access Key)
-* `npx wrangler secret put UNSPLASH_CLIENT_SECRET` (Paste Secret Key)
+1. Create an app in the [Unsplash Developer Portal](https://unsplash.com/developers) with `public`, `write_likes`, and `write_collections` scopes.
+2. Add to `.env.local`:
 
+```env
+NEXT_PUBLIC_UNSPLASH_ACCESS_KEY=...
+UNSPLASH_CLIENT_SECRET=...
+```
 
-6. Deploy the worker: `npx wrangler deploy`
-7. Copy the resulting `*.workers.dev` URL and update the `WORKER_URL` variable inside `unsplash-callback.html`.
+3. Add these redirect URIs to your Unsplash app:
+   - `http://localhost:3000/unsplash-callback`
+   - `http://127.0.0.1:3000/unsplash-callback`
+   - `https://yourdomain.com/unsplash-callback`
 
 ### 4. Run Locally
 
-Serve the root directory using any local development server (e.g., VS Code Live Server, Python `http.server`, or Node `http-server`).
+```bash
+npm run dev
+```
 
-* **Note:** Ensure your local development port matches the `redirectUri` configured in your Unsplash Developer dashboard (e.g., `http://127.0.0.1:5500/unsplash-callback.html`).
+Open [http://localhost:3000](http://localhost:3000).
 
+## Deployment
+
+Deploy to Vercel with zero config:
+
+```bash
+npx vercel --prod
+```
+
+Set all environment variables from `.env.local` in the Vercel dashboard (for `UNSPLASH_CLIENT_SECRET`, use the "Environment Variables" section — it stays server-side).
+
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run Next.js lint |
+| `npm run typecheck` | Run TypeScript type check |

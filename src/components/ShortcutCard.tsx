@@ -136,7 +136,10 @@ export default function ShortcutCard({
     const catSelect = document.getElementById("editSiteCategory") as HTMLSelectElement | null;
     if (nameInput) nameInput.value = site.name;
     if (urlInput) urlInput.value = site.url;
-    if (catSelect) catSelect.value = site.domain;
+    if (catSelect) {
+      const cats = (window as any).__categories;
+      if (cats?.[categoryIndex]) catSelect.value = cats[categoryIndex].id;
+    }
     (window as any).__editingCategoryIndex = categoryIndex;
     (window as any).__editingItemIndex = itemIndex;
     editModal.style.display = "flex";

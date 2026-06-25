@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const UNSPLASH_CLIENT_ID = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY!;
-const UNSPLASH_CLIENT_SECRET = process.env.UNSPLASH_CLIENT_SECRET!;
+const UNSPLASH_CLIENT_ID = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
+const UNSPLASH_CLIENT_SECRET = process.env.UNSPLASH_CLIENT_SECRET;
 
 export async function GET(req: NextRequest) {
+  if (!UNSPLASH_CLIENT_ID || !UNSPLASH_CLIENT_SECRET) {
+    return NextResponse.json({ error: "Unsplash not configured on server" }, { status: 500 });
+  }
+
   const code = req.nextUrl.searchParams.get("code");
 
   if (!code) {

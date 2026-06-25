@@ -168,33 +168,6 @@
     font-weight: 500;
 }
 
-/* Widget Icon (for backwards compatibility) */
-.widget-icon {
-    font-size: 36px;
-    text-align: center;
-}
-
-/* Widget Brand Colors (legacy support) */
-.google-widget .widget-icon {
-    color: #4285F4;
-}
-
-.youtube-widget .widget-icon {
-    color: #FF0000;
-}
-
-.perplexity-widget .widget-icon {
-    color: #20808D;
-}
-
-.x-widget .widget-icon {
-    color: #000000;
-}
-
-.reddit-widget .widget-icon {
-    color: #FF4500;
-}
-
 .widget-form {
     display: flex;
     gap: 10px;
@@ -232,27 +205,6 @@
     background-color: rgba(255, 255, 255, 0.12);
     transform: translateY(-2px);
     box-shadow: 0 4px 16px color-mix(in srgb, var(--engine-color, #4285F4) 30%, transparent);
-}
-
-/* Legacy Widget Input Focus Colors */
-.google-widget .widget-input:focus {
-    border-color: #4285F4;
-}
-
-.youtube-widget .widget-input:focus {
-    border-color: #FF0000;
-}
-
-.perplexity-widget .widget-input:focus {
-    border-color: #20808D;
-}
-
-.x-widget .widget-input:focus {
-    border-color: #1DA1F2;
-}
-
-.reddit-widget .widget-input:focus {
-    border-color: #FF4500;
 }
 
 /* Search History Dropdown */
@@ -388,25 +340,4 @@
 
 .widget-btn:active {
     transform: scale(0.95);
-}
-
-/* Legacy Widget Button Colors */
-.google-widget .widget-btn {
-    background-color: #4285F4;
-}
-
-.youtube-widget .widget-btn {
-    background-color: #FF0000;
-}
-
-.perplexity-widget .widget-btn {
-    background-color: #20808D;
-}
-
-.x-widget .widget-btn {
-    background-color: #000000;
-}
-
-.reddit-widget .widget-btn {
-    background-color: #FF4500;
 }
