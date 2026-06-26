@@ -28,7 +28,7 @@ interface CategoriesContextValue {
 const CategoriesContext = createContext<CategoriesContextValue | null>(null);
 
 export function CategoriesProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const { scheduleSync, forceSync, initKnownIds } = useFirestoreSync();
@@ -37,36 +37,66 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   const uidRef = useRef<string | null>(null);
   uidRef.current = user?.uid || null;
 
-  // Client-only: restore from localStorage immediately on mount
+  // Unified loading effect — gated on auth resolution to avoid stale-key reads and double-renders.
+  // Uses a `cancelled` flag so stale async Firestore responses can't race after user changes.
   useEffect(() => {
-    try {
-      const uid = user?.uid;
-      const key = foyerKey("categories", uid);
+    // Wait until Firebase Auth has resolved — prevents reading the wrong localStorage key
+    // while user is transiently null during the auth handshake.
+    if (authLoading) return;
+
+    let cancelled = false;
+
+    if (!user) {
+      // ── Unauthenticated path ─────────────────────────────────────────────
+      // Read from the anonymous-scoped key (or legacy bare key).
+      const key = foyerKey("categories", null);
       const local = localStorage.getItem(key) || localStorage.getItem("categories");
       if (local) {
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed)) parsed.forEach((c: any) => { if (!c.websites) c.websites = []; });
-        setCategories(parsed);
-        setLoading(false);
+        try {
+          const parsed = JSON.parse(local);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((c: any) => { if (!c.websites) c.websites = []; });
+            if (!cancelled) setCategories(parsed);
+          }
+        } catch { /* ignore parse errors */ }
+      } else {
+        // First-ever visit — seed with defaults
+        if (!cancelled) setCategories(JSON.parse(JSON.stringify(defaultCategories)));
       }
-    } catch { /* ignore */ }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      if (!cancelled) setLoading(false);
+      return;
+    }
 
-  // Sync with Firestore on mount / auth change
-  useEffect(() => {
-    if (!user) return;
+    // ── Authenticated path ───────────────────────────────────────────────
     const uid = user.uid;
 
+    // Clear state when the logged-in user changes
     if (prevUidRef.current !== null && prevUidRef.current !== uid) {
       setCategories([]);
       setLoading(true);
     }
     prevUidRef.current = uid;
 
+    // Optimistically populate from user-scoped localStorage while Firestore fetches.
+    // We do NOT set loading:false here — we wait for Firestore to confirm first so the
+    // UI never briefly renders a stale snapshot as the final state.
+    const catKey = foyerKey("categories", uid);
+    const optimisticLocal = localStorage.getItem(catKey);
+    if (optimisticLocal) {
+      try {
+        const parsed = JSON.parse(optimisticLocal);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((c: any) => { if (!c.websites) c.websites = []; });
+          if (!cancelled) setCategories(parsed);
+        }
+      } catch { /* ignore */ }
+    }
+
     (async () => {
       try {
         const catsSnap = await getDocs(fsCollection(db, "users", uid, "categories"));
-        const catKey = foyerKey("categories", uid);
+        if (cancelled) return;
+
         if (!catsSnap.empty) {
           const sortedCats = catsSnap.docs
             .sort((a, b) => (a.data().orderIndex ?? 999) - (b.data().orderIndex ?? 999))
@@ -79,13 +109,15 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
               .map((s) => ({ id: s.id, name: s.data().name, url: s.data().url, domain: s.data().domain, customIcon: s.data().customIcon } as Website));
             loaded.push({ id: cat.id, name: cat.name, icon: cat.icon || "", websites: sortedSites });
           }
+          if (cancelled) return;
           setCategories(loaded);
           localStorage.setItem(catKey, JSON.stringify(loaded));
           initKnownIds(loaded);
         } else {
-          // First visit for this user — Firestore empty, use defaults
+          // First visit for this user — Firestore empty, seed defaults
           const data: Category[] = JSON.parse(JSON.stringify(defaultCategories));
           data.forEach((c) => c.websites.forEach((s) => { if (!s.id) s.id = generateSiteId(); }));
+          if (cancelled) return;
           setCategories(data);
           localStorage.setItem(catKey, JSON.stringify(data));
           initKnownIds(data);
@@ -93,17 +125,19 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error("Firestore load failed, falling back to localStorage:", err);
-        const catKey = foyerKey("categories", uid);
+        if (cancelled) return;
         const local = localStorage.getItem(catKey) || localStorage.getItem("categories");
         if (local) {
-          setCategories(JSON.parse(local));
+          try { setCategories(JSON.parse(local)); } catch { /* ignore */ }
         } else {
           setCategories(JSON.parse(JSON.stringify(defaultCategories)));
         }
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     })();
-  }, [user]);
+
+    return () => { cancelled = true; };
+  }, [user, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const persist = useCallback((newCats: Category[]) => {
     setCategories(newCats);
