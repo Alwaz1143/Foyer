@@ -20,6 +20,7 @@ export interface UserSettings {
   selectedSearchEngine: string;
   lastWallpaperKeyword: string;
   customWallpaperKeywords: string;
+  googleAiMode?: boolean;
 }
 
 export interface UnsplashState {

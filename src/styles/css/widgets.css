@@ -198,6 +198,49 @@
     font-weight: 500;
 }
 
+/* AI Mode Toggle (sparkle icon inside search input) */
+.ai-mode-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    z-index: 5;
+    border-radius: 8px;
+    transition: background 0.2s ease;
+    line-height: 0;
+}
+
+.ai-mode-toggle:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.ai-sparkle-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+    fill: none;
+    stroke: rgba(0, 0, 0, 0.35);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    transition: all 0.2s ease;
+}
+
+.ai-mode-toggle.ai-active .ai-sparkle-icon {
+    fill: var(--engine-color, #4285F4);
+    stroke: var(--engine-color, #4285F4);
+}
+
+.unified-search-widget .widget-input {
+    padding-right: 42px;
+}
+
 .widget-form {
     display: flex;
     gap: 10px;

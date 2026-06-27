@@ -77,6 +77,7 @@ export function useFirestoreSync() {
           selectedSearchEngine: getLocal("selectedSearchEngine") || "google",
           lastWallpaperKeyword: getLocal("lastWallpaperKeyword") || "",
           customWallpaperKeywords: getLocal("customWallpaperKeywords") || "",
+          googleAiMode: getLocal("googleAiMode") === "true",
         },
       }, { merge: true });
 

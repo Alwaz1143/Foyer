@@ -437,6 +437,11 @@ export default function HomePage() {
             </div>
             <form className="widget-form" id="unifiedSearchForm">
               <div className="search-input-wrapper">
+                <button type="button" className="ai-mode-toggle" id="aiModeToggle" title="Toggle Google AI mode">
+                  <svg className="ai-sparkle-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z"/>
+                  </svg>
+                </button>
                 <input type="text" placeholder="Search Google..." className="widget-input" id="unifiedSearchInput" autoComplete="off" />
                 <div className="search-history-dropdown" id="searchHistoryDropdown"></div>
               </div>
