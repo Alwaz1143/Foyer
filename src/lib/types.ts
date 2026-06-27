@@ -31,7 +31,10 @@ export interface UnsplashState {
 
 export interface SearchEngine {
   name: string;
+  /** Font Awesome class string e.g. "fab fa-google". Used when iconSvg is absent. */
   icon: string;
+  /** Inline SVG HTML string for the selector button icon (overrides `icon`). */
+  iconSvg?: string;
   color: string;
   placeholder: string;
   url: string;

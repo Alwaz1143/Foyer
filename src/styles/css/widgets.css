@@ -86,6 +86,22 @@
     transform: scale(1.05);
 }
 
+/* Engine selector icon container — wraps both FA <i> and SVG icons */
+.engine-selector-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    color: var(--engine-color, #4285F4);
+    line-height: 1;
+}
+
+.engine-selector-icon svg {
+    width: 1em;
+    height: 1em;
+    display: block;
+}
+
 .engine-dropdown-arrow {
     font-size: 12px;
     transition: transform 0.2s ease;
@@ -154,9 +170,27 @@
     text-align: center;
 }
 
-.engine-option[data-engine="google"] i { color: #4285F4; }
+/* SVG icon wrapper inside engine-option — same size/alignment as FA <i> */
+.engine-option-svg-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    flex-shrink: 0;
+}
+
+.engine-option-svg-icon svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+.engine-option[data-engine="google"] .engine-option-svg-icon { color: #4285F4; }
 .engine-option[data-engine="youtube"] i { color: #FF0000; }
-.engine-option[data-engine="perplexity"] i { color: #20808D; }
+.engine-option[data-engine="perplexity"] .engine-option-svg-icon { color: #22B8CD; }
+.engine-option[data-engine="chatgpt"] .engine-option-svg-icon { color: #ffffff; }
+.engine-option[data-engine="claude"] .engine-option-svg-icon { color: #D97757; }
+.engine-option[data-engine="gemini"] .engine-option-svg-icon { color: #3186FF; }
 .engine-option[data-engine="x"] i { color: #000000; }
 .engine-option[data-engine="reddit"] i { color: #FF4500; }
 

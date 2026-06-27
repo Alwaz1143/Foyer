@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { searchEngines, MAX_HISTORY_ITEMS } from "@/lib/constants";
 import { escapeHtml } from "@/lib/utils";
+import { showToast } from "@/lib/toast";
 
 export function useSearch() {
   useEffect(() => {
@@ -24,7 +25,24 @@ export function useSearch() {
       const widget = document.getElementById("unifiedSearchWidget");
       const iconEl = document.getElementById("currentEngineIcon");
       if (widget) widget.style.setProperty("--engine-color", engine.color);
-      if (iconEl) iconEl.className = engine.icon;
+
+      if (iconEl) {
+        if (engine.iconSvg) {
+          // SVG icon: inject raw SVG markup into the span container
+          iconEl.innerHTML = engine.iconSvg;
+          // Ensure the SVG inherits the engine color
+          const svgEl = iconEl.querySelector("svg");
+          if (svgEl) {
+            svgEl.style.color = engine.color;
+            svgEl.style.width = "1em";
+            svgEl.style.height = "1em";
+          }
+        } else {
+          // FA icon: render an <i> element with the FA class
+          iconEl.innerHTML = `<i class="${engine.icon}"></i>`;
+        }
+      }
+
       _input.placeholder = engine.placeholder;
 
       _dropdown.querySelectorAll(".engine-option").forEach((opt) => {
@@ -124,7 +142,17 @@ export function useSearch() {
       const engine = searchEngines[currentEngine];
       if (!engine) return;
       saveHistory(currentEngine, query);
-      window.location.href = `${engine.url}${encodeURIComponent(query)}`;
+
+      // Engines whose SPAs ignore URL query params — copy to clipboard and open app
+      const clipboardEngines = ["gemini", "claude"];
+      if (clipboardEngines.includes(currentEngine)) {
+        navigator.clipboard.writeText(query).catch(() => {/* clipboard unavailable */});
+        showToast(`📋 Copied! Paste in ${engine.name} & press Enter`);
+        window.open(`${engine.url}${encodeURIComponent(query)}`, "_blank");
+      } else {
+        window.location.href = `${engine.url}${encodeURIComponent(query)}`;
+      }
+
       _input.value = "";
       hideHistory();
     });
