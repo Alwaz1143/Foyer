@@ -3,7 +3,7 @@
 import { useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, writeBatch } from "firebase/firestore";
+import { doc, collection as fsCollection, getDocs, writeBatch } from "firebase/firestore";
 import { foyerKey } from "@/lib/storage";
 import type { Category } from "@/lib/types";
 
@@ -12,18 +12,43 @@ export function useFirestoreSync() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const knownCatIds = useRef<Set<string>>(new Set());
   const knownSiteIds = useRef<Map<string, Set<string>>>(new Map());
+  // Tracks whether we've ever populated knownIds in this session.
+  // If false, syncNow will read Firestore first before writing (hydrate-on-first-sync).
+  const hydratedRef = useRef<boolean>(false);
 
   const scheduleSync = useCallback((categories: Category[]) => {
     if (!user) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => syncNow(categories), 2000);
-  }, [user]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const syncNow = useCallback(async (categories: Category[]) => {
     if (!user) return;
     const uid = user.uid;
 
     try {
+      // ── Hydrate-on-first-sync ────────────────────────────────────────────
+      // On a fresh mount the knownCatIds/knownSiteIds refs are empty.
+      // Before we write anything, read the current Firestore state so the
+      // cleanup loop has accurate data and won't leave orphaned documents.
+      if (!hydratedRef.current) {
+        const catsSnap = await getDocs(fsCollection(db, "users", uid, "categories"));
+        const freshCatIds = new Set<string>();
+        const freshSiteIds = new Map<string, Set<string>>();
+        for (const catDoc of catsSnap.docs) {
+          freshCatIds.add(catDoc.id);
+          const sitesSnap = await getDocs(
+            fsCollection(db, "users", uid, "categories", catDoc.id, "websites")
+          );
+          freshSiteIds.set(catDoc.id, new Set(sitesSnap.docs.map((s) => s.id)));
+        }
+        // Only overwrite refs if they're still empty (initKnownIds may have
+        // run concurrently during an initial load — don't clobber that).
+        if (knownCatIds.current.size === 0) knownCatIds.current = freshCatIds;
+        if (knownSiteIds.current.size === 0) knownSiteIds.current = freshSiteIds;
+        hydratedRef.current = true;
+      }
+
       const batch = writeBatch(db);
       const currentCatIds = new Set(categories.map((c) => c.id));
 
@@ -86,7 +111,7 @@ export function useFirestoreSync() {
     } catch (err) {
       console.error("Foyer: Firestore sync failed:", err);
     }
-  }, [user]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const forceSync = useCallback(async (categories: Category[]) => {
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
@@ -99,6 +124,8 @@ export function useFirestoreSync() {
     categories.forEach((c) => {
       knownSiteIds.current.set(c.id, new Set(c.websites.map((s) => s.id)));
     });
+    // Mark as hydrated — we have accurate known IDs from the loaded data.
+    hydratedRef.current = true;
   }, []);
 
   return { scheduleSync, forceSync, initKnownIds };

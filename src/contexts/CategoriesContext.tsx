@@ -77,20 +77,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     }
     prevUidRef.current = uid;
 
-    // Optimistically populate from user-scoped localStorage while Firestore fetches.
-    // We do NOT set loading:false here — we wait for Firestore to confirm first so the
-    // UI never briefly renders a stale snapshot as the final state.
     const catKey = foyerKey("categories", uid);
-    const optimisticLocal = localStorage.getItem(catKey);
-    if (optimisticLocal) {
-      try {
-        const parsed = JSON.parse(optimisticLocal);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((c: any) => { if (!c.websites) c.websites = []; });
-          if (!cancelled) setCategories(parsed);
-        }
-      } catch { /* ignore */ }
-    }
 
     (async () => {
       try {
@@ -110,9 +97,33 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
             loaded.push({ id: cat.id, name: cat.name, icon: cat.icon || "", websites: sortedSites });
           }
           if (cancelled) return;
-          setCategories(loaded);
-          localStorage.setItem(catKey, JSON.stringify(loaded));
-          initKnownIds(loaded);
+
+          // ── Dedup pass ──────────────────────────────────────────────────
+          // Firestore may have accumulated duplicate sites (same URL in the
+          // same category) from past bad syncs. Deduplicate by URL, keeping
+          // the entry with the lowest orderIndex (i.e. first in the sorted
+          // list). If any dupes are found, write the cleaned data back.
+          let dedupNeeded = false;
+          const deduped = loaded.map((cat) => {
+            const seen = new Map<string, Website>();
+            for (const site of cat.websites) {
+              const key = site.url.trim().toLowerCase();
+              if (!seen.has(key)) {
+                seen.set(key, site);
+              } else {
+                dedupNeeded = true;
+              }
+            }
+            return { ...cat, websites: Array.from(seen.values()) };
+          });
+
+          setCategories(deduped);
+          localStorage.setItem(catKey, JSON.stringify(deduped));
+          initKnownIds(deduped);
+          if (dedupNeeded) {
+            console.info("Foyer: deduplicated sites detected and cleaned.");
+            await forceSync(deduped);
+          }
         } else {
           // First visit for this user — Firestore empty, seed defaults
           const data: Category[] = JSON.parse(JSON.stringify(defaultCategories));
