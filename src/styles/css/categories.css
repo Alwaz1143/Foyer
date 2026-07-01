@@ -178,6 +178,14 @@
     animation: gridPulse 1s ease-in-out infinite;
 }
 
+body.drag-active .category-grid:empty {
+    min-height: 68px;
+    padding: 8px;
+    outline: 2px dashed rgba(102, 126, 234, 0.4);
+    outline-offset: -6px;
+    border-radius: 12px;
+}
+
 .category-grid.collapsed .shortcut-item:nth-child(n+13) {
     display: none;
 }

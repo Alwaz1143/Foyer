@@ -179,6 +179,7 @@ export default function ShortcutCard({
         rel="noopener noreferrer"
         className="shortcut-link"
         aria-label={`Visit ${site.name}`}
+        draggable={false}
         onClick={handleLinkClick}
         onContextMenu={handleContextMenu}
       >

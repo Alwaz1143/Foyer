@@ -37,6 +37,12 @@
     transition: transform 0.2s ease, filter 0.2s ease;
 }
 
+.shortcut-item.drop-hover {
+    transform: scale(0.92);
+    opacity: 0.6;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
 /* Placeholder for drop position */
 .shortcut-item.placeholder {
     background: linear-gradient(135deg, 

@@ -29,7 +29,7 @@ export default function HomePage() {
   const { toggleWallpaper } = useWallpaper();
   const { connected, startOAuth } = useUnsplash();
   useSearch();
-  const { categories, addSite, editSite, addCategory, editCategory, deleteCategory, replaceAll, importBookmarks } = useCategories();
+  const { categories, addSite, editSite, moveSite, addCategory, editCategory, deleteCategory, replaceAll, importBookmarks } = useCategories();
 
   // User menu + basic click handlers
   useEffect(() => {
@@ -203,6 +203,21 @@ export default function HomePage() {
       const url = (document.getElementById("editSiteUrl") as HTMLInputElement)?.value.trim();
       if (!name || !url) return;
       const domain = extractDomain(url);
+
+      const catSelect = document.getElementById("editSiteCategory") as HTMLSelectElement | null;
+      if (catSelect) {
+        const targetCatId = catSelect.value;
+        const targetCatIdx = categories.findIndex((c) => c.id === targetCatId);
+        if (targetCatIdx >= 0 && targetCatIdx !== catIdx) {
+          editSite(catIdx, itemIdx, { name, url, domain });
+          moveSite(catIdx, itemIdx, targetCatIdx, categories[targetCatIdx].websites.length);
+          closeModal("editSiteModal");
+          (window as any).__editingCategoryIndex = undefined;
+          (window as any).__editingItemIndex = undefined;
+          showToast("Site updated!");
+          return;
+        }
+      }
       editSite(catIdx, itemIdx, { name, url, domain });
       closeModal("editSiteModal");
       (window as any).__editingCategoryIndex = undefined;
@@ -219,7 +234,7 @@ export default function HomePage() {
       cancelEditBtn?.removeEventListener("click", handleCancelEdit);
       form?.removeEventListener("submit", handleEditSubmit);
     };
-  }, [editSite]);
+  }, [editSite, moveSite, categories]);
 
   // Section modal
   useEffect(() => {
