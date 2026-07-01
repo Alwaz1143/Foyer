@@ -30,6 +30,15 @@ export interface UnsplashState {
   foyerCollectionId: string | null;
 }
 
+export interface ParsedBookmark {
+  title: string;
+  url: string;
+  addDate?: number;
+  folder?: string;
+  folderPath?: string[];
+  icon?: string;
+}
+
 export interface SearchEngine {
   name: string;
   /** Font Awesome class string e.g. "fab fa-google". Used when iconSvg is absent. */

@@ -8,6 +8,9 @@ import { useWallpaper } from "@/hooks/useWallpaper";
 import { useUnsplash } from "@/hooks/useUnsplash";
 import { useSearch } from "@/hooks/useSearch";
 import { useCategories } from "@/contexts/CategoriesContext";
+import { classifySite } from "@/lib/classifySite";
+import { parseBookmarkHtml } from "@/lib/bookmarkParser";
+import type { ParsedBookmark } from "@/lib/types";
 import { UNSPLASH_CONFIG } from "@/lib/constants";
 import { showToast } from "@/lib/toast";
 import { foyerKey } from "@/lib/storage";
@@ -26,7 +29,7 @@ export default function HomePage() {
   const { toggleWallpaper } = useWallpaper();
   const { connected, startOAuth } = useUnsplash();
   useSearch();
-  const { categories, addSite, editSite, addCategory, editCategory, deleteCategory, replaceAll } = useCategories();
+  const { categories, addSite, editSite, addCategory, editCategory, deleteCategory, replaceAll, importBookmarks } = useCategories();
 
   // User menu + basic click handlers
   useEffect(() => {
@@ -126,15 +129,35 @@ export default function HomePage() {
     const closeModalBtn = document.getElementById("closeModal");
     const cancelBtn = document.getElementById("cancelBtn");
     const form = document.getElementById("addSiteForm") as HTMLFormElement | null;
+    const urlInput = document.getElementById("siteUrl") as HTMLInputElement | null;
+    const catSelect = document.getElementById("siteCategory") as HTMLSelectElement | null;
+    const hintEl = document.getElementById("detectHint");
+
+    const detectCategory = () => {
+      if (!urlInput || !catSelect || !categories.length) return;
+      const url = urlInput.value.trim();
+      if (!url) { if (hintEl) hintEl.textContent = ""; return; }
+      const name = (document.getElementById("siteName") as HTMLInputElement)?.value.trim() || "";
+      const result = classifySite(name, url, categories);
+      if (result.confidence !== "none" && result.categoryId) {
+        catSelect.value = result.categoryId;
+        if (hintEl) hintEl.textContent = `Detected: ${result.suggestedCategoryName || ""}`;
+      } else if (result.confidence === "medium" && result.suggestedCategoryName) {
+        if (hintEl) hintEl.textContent = `Suggested: ${result.suggestedCategoryName} (create section first)`;
+      } else {
+        if (hintEl) hintEl.textContent = "";
+      }
+    };
 
     const handleOpenAdd = () => {
       const m = document.getElementById("addSiteModal");
       if (m) m.style.display = "flex";
       const nameInput = document.getElementById("siteName") as HTMLInputElement | null;
       nameInput?.focus();
+      if (hintEl) hintEl.textContent = "";
     };
-    const handleCloseAdd = () => closeModal("addSiteModal");
-    const handleCancelAdd = () => closeModal("addSiteModal");
+    const handleCloseAdd = () => { closeModal("addSiteModal"); if (hintEl) hintEl.textContent = ""; };
+    const handleCancelAdd = () => { closeModal("addSiteModal"); if (hintEl) hintEl.textContent = ""; };
     const handleAddSubmit = (e: Event) => {
       e.preventDefault();
       const name = (document.getElementById("siteName") as HTMLInputElement)?.value.trim();
@@ -144,6 +167,7 @@ export default function HomePage() {
       addSite(name, url, catId);
       closeModal("addSiteModal");
       form?.reset();
+      if (hintEl) hintEl.textContent = "";
       showToast(`"${name}" added!`);
     };
 
@@ -151,14 +175,16 @@ export default function HomePage() {
     closeModalBtn?.addEventListener("click", handleCloseAdd);
     cancelBtn?.addEventListener("click", handleCancelAdd);
     form?.addEventListener("submit", handleAddSubmit);
+    urlInput?.addEventListener("blur", detectCategory);
 
     return () => {
       addSiteBtn?.removeEventListener("click", handleOpenAdd);
       closeModalBtn?.removeEventListener("click", handleCloseAdd);
       cancelBtn?.removeEventListener("click", handleCancelAdd);
       form?.removeEventListener("submit", handleAddSubmit);
+      urlInput?.removeEventListener("blur", detectCategory);
     };
-  }, [addSite]);
+  }, [addSite, categories]);
 
   // Edit Site modal (submit only; open is handled by ShortcutCard)
   useEffect(() => {
@@ -317,6 +343,141 @@ export default function HomePage() {
     };
   }, [categories, replaceAll]);
 
+  // Bookmark Import modal
+  useEffect(() => {
+    const importBtn = document.getElementById("importBookmarksBtn");
+    const closeBtn = document.getElementById("closeImportModal");
+    const cancelBtn = document.getElementById("cancelImportBtn");
+    const confirmBtn = document.getElementById("confirmImportBtn");
+    const doneBtn = document.getElementById("closeImportDoneBtn");
+    const fileInput = document.getElementById("importBookmarkFile") as HTMLInputElement | null;
+
+    let parsedBookmarks: ParsedBookmark[] = [];
+
+    const resetModal = () => {
+      document.getElementById("importStepUpload")!.style.display = "";
+      document.getElementById("importStepPreview")!.style.display = "none";
+      document.getElementById("importStepDone")!.style.display = "none";
+      confirmBtn!.style.display = "none";
+      doneBtn!.style.display = "none";
+      cancelBtn!.textContent = "Cancel";
+      if (fileInput) fileInput.value = "";
+      parsedBookmarks = [];
+    };
+
+    const openImportModal = () => {
+      resetModal();
+      const m = document.getElementById("importBookmarksModal");
+      if (m) m.style.display = "flex";
+    };
+
+    const closeImportModal = () => {
+      closeModal("importBookmarksModal");
+      resetModal();
+    };
+
+    const handleFileChange = () => {
+      const file = fileInput?.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const html = ev.target?.result as string;
+        if (!html) return;
+        parsedBookmarks = parseBookmarkHtml(html);
+        if (parsedBookmarks.length === 0) {
+          showToast("No valid bookmarks found in the file.", "error");
+          return;
+        }
+
+        const skipExisting = (document.getElementById("importSkipExisting") as HTMLInputElement)?.checked ?? true;
+        const categories = (window as any).__categories || [];
+
+        let filtered = parsedBookmarks;
+        if (skipExisting) {
+          const existingUrls = new Set<string>();
+          for (const cat of categories) {
+            for (const site of cat.websites || []) {
+              existingUrls.add(site.url.trim().toLowerCase());
+            }
+          }
+          filtered = parsedBookmarks.filter((b) => !existingUrls.has(b.url.trim().toLowerCase()));
+        }
+
+        const tbody = document.getElementById("importTableBody")!;
+        tbody.innerHTML = filtered.map((b) => {
+          const result = classifySite(b.title, b.url, categories, b.folder);
+          const badge = result.confidence === "high" ? "🟢 High" :
+            result.confidence === "medium" ? "🟡 Medium" :
+            result.confidence === "low" ? "🟠 Low" : "⚪ None";
+          const catName = result.suggestedCategoryName || "Uncategorized";
+          return `<tr>
+            <td class="import-title">${b.title}</td>
+            <td class="import-category">${catName}</td>
+            <td class="import-confidence"><span class="confidence-badge confidence-${result.confidence}">${badge}</span></td>
+          </tr>`;
+        }).join("");
+
+        document.getElementById("importSummary")!.textContent =
+          `Found ${parsedBookmarks.length} bookmarks${skipExisting ? `. ${filtered.length} new after removing existing.` : "."}`;
+
+        document.getElementById("importStepUpload")!.style.display = "none";
+        document.getElementById("importStepPreview")!.style.display = "";
+        confirmBtn!.style.display = "";
+        cancelBtn!.textContent = "Back";
+      };
+      reader.readAsText(file);
+    };
+
+    const handleConfirm = () => {
+      const autoCreate = (document.getElementById("importAutoCreate") as HTMLInputElement)?.checked ?? false;
+      const categories = (window as any).__categories || [];
+      const skipExisting = (document.getElementById("importSkipExisting") as HTMLInputElement)?.checked ?? true;
+
+      let toImport = parsedBookmarks;
+      if (skipExisting) {
+        const existingUrls = new Set<string>();
+        for (const cat of categories) {
+          for (const site of cat.websites || []) {
+            existingUrls.add(site.url.trim().toLowerCase());
+          }
+        }
+        toImport = parsedBookmarks.filter((b) => !existingUrls.has(b.url.trim().toLowerCase()));
+      }
+
+      const result = importBookmarks(toImport, { autoCreateCategories: autoCreate });
+
+      document.getElementById("importStepPreview")!.style.display = "none";
+      document.getElementById("importStepDone")!.style.display = "";
+      confirmBtn!.style.display = "none";
+      doneBtn!.style.display = "";
+      cancelBtn!.style.display = "none";
+
+      let summary = `✅ Added <strong>${result.added}</strong> bookmarks`;
+      if (result.skipped > 0) summary += `, skipped <strong>${result.skipped}</strong> duplicates`;
+      if (result.createdCategories.length > 0) summary += `<br>📁 Created sections: <strong>${result.createdCategories.join(", ")}</strong>`;
+      if (result.uncategorized.length > 0) summary += `<br>⚠️ <strong>${result.uncategorized.length}</strong> bookmarks could not be categorized`;
+      document.getElementById("importDoneSummary")!.innerHTML = summary;
+
+      showToast(`Imported ${result.added} bookmarks!`);
+    };
+
+    importBtn?.addEventListener("click", openImportModal);
+    closeBtn?.addEventListener("click", closeImportModal);
+    cancelBtn?.addEventListener("click", closeImportModal);
+    confirmBtn?.addEventListener("click", handleConfirm);
+    doneBtn?.addEventListener("click", closeImportModal);
+    fileInput?.addEventListener("change", handleFileChange);
+
+    return () => {
+      importBtn?.removeEventListener("click", openImportModal);
+      closeBtn?.removeEventListener("click", closeImportModal);
+      cancelBtn?.removeEventListener("click", closeImportModal);
+      confirmBtn?.removeEventListener("click", handleConfirm);
+      doneBtn?.removeEventListener("click", closeImportModal);
+      fileInput?.removeEventListener("change", handleFileChange);
+    };
+  }, [importBookmarks]);
+
   // Populate category dropdowns
   useEffect(() => {
     ["siteCategory", "editSiteCategory"].forEach((selectId) => {
@@ -458,6 +619,7 @@ export default function HomePage() {
           <div className="data-controls">
             <button className="data-btn export-btn" id="exportDataBtn" type="button" title="Export all data to JSON file"><i className="fas fa-download"></i><span className="btn-text">Export</span></button>
             <button className="data-btn import-btn" id="importDataBtn" type="button" title="Import data from JSON file"><i className="fas fa-upload"></i><span className="btn-text">Import</span></button>
+            <button className="data-btn bookmark-import-btn" id="importBookmarksBtn" type="button" title="Import browser bookmarks"><i className="fas fa-bookmark"></i><span className="btn-text">Bookmarks</span></button>
           </div>
         </div>
         <input type="file" id="importFileInput" accept=".json" style={{ display: "none" }} />
@@ -488,7 +650,7 @@ export default function HomePage() {
           <form id="addSiteForm" className="modal-form">
             <div className="form-group"><label htmlFor="siteName">Site Name:</label><input type="text" id="siteName" placeholder="e.g., My Site" required /></div>
             <div className="form-group"><label htmlFor="siteUrl">URL:</label><input type="text" id="siteUrl" placeholder="e.g., example.com or https://example.com" required /></div>
-            <div className="form-group"><label htmlFor="siteCategory">Category:</label><select id="siteCategory" required></select></div>
+            <div className="form-group"><label htmlFor="siteCategory">Category:</label><select id="siteCategory" required></select><div id="detectHint" className="detect-hint"></div></div>
             <div className="modal-actions">
               <button type="button" className="btn-secondary" id="cancelBtn">Cancel</button>
               <button type="submit" className="btn-primary">Add Site</button>
@@ -524,6 +686,58 @@ export default function HomePage() {
               <button type="submit" className="btn-primary">Save Section</button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div id="importBookmarksModal" className="modal">
+        <div className="modal-content import-modal-content">
+          <div className="modal-header">
+            <h2 id="importModalTitle">Import Bookmarks</h2>
+            <button className="close-btn" id="closeImportModal" aria-label="Close import modal">&times;</button>
+          </div>
+          <div className="modal-form" id="importModalBody">
+            <div id="importStepUpload">
+              <p style={{ marginBottom: 16, color: "var(--text-color)" }}>
+                Export your bookmarks from your browser as an HTML file, then upload it here.
+                Foyer will automatically categorize them into your existing sections.
+              </p>
+              <div className="form-group">
+                <label htmlFor="importBookmarkFile">Bookmark HTML file:</label>
+                <input type="file" id="importBookmarkFile" accept=".html" />
+              </div>
+              <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input type="checkbox" id="importSkipExisting" defaultChecked style={{ width: 18, height: 18 }} />
+                <label htmlFor="importSkipExisting" style={{ margin: 0 }}>Skip bookmarks that already exist</label>
+              </div>
+              <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input type="checkbox" id="importAutoCreate" style={{ width: 18, height: 18 }} />
+                <label htmlFor="importAutoCreate" style={{ margin: 0 }}>Create new sections for unmatched domains</label>
+              </div>
+            </div>
+            <div id="importStepPreview" style={{ display: "none" }}>
+              <p id="importSummary" style={{ marginBottom: 12, color: "var(--text-color)", fontWeight: 500 }}></p>
+              <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--input-border)", borderRadius: 12, marginBottom: 12 }}>
+                <table className="import-table" id="importPreviewTable">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Category</th>
+                      <th>Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody id="importTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="importStepDone" style={{ display: "none" }}>
+              <p id="importDoneSummary" style={{ color: "var(--text-color)", fontSize: 16, lineHeight: 1.6 }}></p>
+            </div>
+          </div>
+          <div className="modal-actions" style={{ padding: "0 28px 24px" }}>
+            <button type="button" className="btn-secondary" id="cancelImportBtn">Cancel</button>
+            <button type="button" className="btn-primary" id="confirmImportBtn" style={{ display: "none" }}>Import</button>
+            <button type="button" className="btn-primary" id="closeImportDoneBtn" style={{ display: "none" }}>Done</button>
+          </div>
         </div>
       </div>
 

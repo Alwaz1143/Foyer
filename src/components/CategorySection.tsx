@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import type { Category } from "@/lib/types";
 import { getCategoryDisplayName } from "@/lib/utils";
 import ShortcutCard from "./ShortcutCard";
+
+const INITIAL_VISIBLE = 12;
 
 export default function CategorySection({
   category,
@@ -11,8 +14,12 @@ export default function CategorySection({
   category: Category;
   categoryIndex: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const displayName = getCategoryDisplayName(category) || category.name || "Untitled Section";
   const icon = (category.icon && category.icon.trim()) || "📁";
+  const sites = category.websites ?? [];
+  const siteCount = sites.length;
+  const hasOverflow = siteCount > INITIAL_VISIBLE;
 
   const handleEditSection = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -80,7 +87,7 @@ export default function CategorySection({
           <span className="category-icon">{icon}</span>
           <h3 className="category-title">{displayName}</h3>
         </div>
-        <span className="category-count">{(category.websites ?? []).length}</span>
+        <span className="category-count">{siteCount}</span>
         <button
           className="section-edit-btn"
           type="button"
@@ -90,8 +97,8 @@ export default function CategorySection({
           <i className="fas fa-pen"></i>
         </button>
       </div>
-      <div className="category-grid" data-category-index={categoryIndex}>
-        {(category.websites ?? []).map((site, idx) => (
+      <div className={`category-grid${hasOverflow && !expanded ? " collapsed" : ""}`} data-category-index={categoryIndex}>
+        {sites.map((site, idx) => (
           <ShortcutCard
             key={site.id || idx}
             site={site}
@@ -100,6 +107,19 @@ export default function CategorySection({
           />
         ))}
       </div>
+      {hasOverflow && (
+        <button
+          className={`section-toggle-btn${expanded ? " expanded" : ""}`}
+          onClick={() => setExpanded(!expanded)}
+          type="button"
+        >
+          {expanded ? (
+            <>Show less <i className="fas fa-chevron-up"></i></>
+          ) : (
+            <>Show {siteCount - INITIAL_VISIBLE} more <i className="fas fa-chevron-down"></i></>
+          )}
+        </button>
+      )}
     </div>
   );
 }

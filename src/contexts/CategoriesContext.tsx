@@ -8,7 +8,9 @@ import { useFirestoreSync } from "@/hooks/useFirestoreSync";
 import { defaultCategories } from "@/lib/defaults";
 import { generateSiteId, generateCategoryId, getRootDomain } from "@/lib/utils";
 import { foyerKey } from "@/lib/storage";
-import type { Category, Website } from "@/lib/types";
+import { classifySite } from "@/lib/classifySite";
+import { normalizeUrl } from "@/lib/normalizeUrl";
+import type { Category, Website, ParsedBookmark } from "@/lib/types";
 
 interface CategoriesContextValue {
   categories: Category[];
@@ -23,6 +25,10 @@ interface CategoriesContextValue {
   reorderCategories: (fromIdx: number, toIdx: number) => void;
   replaceAll: (newCategories: Category[]) => void;
   save: () => void;
+  importBookmarks: (
+    bookmarks: ParsedBookmark[],
+    opts?: { autoCreateCategories?: boolean }
+  ) => { added: number; skipped: number; uncategorized: ParsedBookmark[]; createdCategories: string[] };
 }
 
 const CategoriesContext = createContext<CategoriesContextValue | null>(null);
@@ -256,12 +262,84 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     });
   }, [scheduleSync]);
 
+  const importBookmarks = useCallback((
+    bookmarks: ParsedBookmark[],
+    opts?: { autoCreateCategories?: boolean }
+  ): { added: number; skipped: number; uncategorized: ParsedBookmark[]; createdCategories: string[] } => {
+    const autoCreate = opts?.autoCreateCategories ?? false;
+
+    // Capture the current categories synchronously to compute the result
+    let currentCats: Category[] = [];
+    setCategories((prev) => { currentCats = prev; return prev; });
+
+    const result = { added: 0, skipped: 0, uncategorized: [] as ParsedBookmark[], createdCategories: [] as string[] };
+    const next = currentCats.map((c) => ({ ...c, websites: [...c.websites] }));
+    const existingUrls = new Set<string>();
+    const existingIds = new Set(next.map((c) => c.id));
+    for (const cat of next) {
+      for (const site of cat.websites) {
+        existingUrls.add(normalizeUrl(site.url));
+      }
+    }
+
+    for (const bookmark of bookmarks) {
+      const normalUrl = normalizeUrl(bookmark.url);
+      if (existingUrls.has(normalUrl)) {
+        result.skipped++;
+        continue;
+      }
+
+      const classification = classifySite(bookmark.title, bookmark.url, next, bookmark.folder);
+
+      let categoryId = classification.categoryId;
+      if (!categoryId && autoCreate && classification.suggestedCategoryName) {
+        const newId = generateCategoryId(classification.suggestedCategoryName, existingIds);
+        const newCategory: Category = {
+          id: newId,
+          name: classification.suggestedCategoryName,
+          icon: classification.suggestedCategoryName.charAt(0).toUpperCase() || "📁",
+          websites: [],
+        };
+        next.push(newCategory);
+        existingIds.add(newId);
+        categoryId = newId;
+        result.createdCategories.push(classification.suggestedCategoryName);
+      }
+
+      if (categoryId) {
+        const cat = next.find((c) => c.id === categoryId);
+        if (cat) {
+          const domain = getRootDomain(bookmark.url);
+          cat.websites.push({
+            id: generateSiteId(),
+            name: bookmark.title,
+            url: bookmark.url,
+            domain,
+            customIcon: bookmark.icon || "",
+          });
+          existingUrls.add(normalUrl);
+          result.added++;
+        } else {
+          result.uncategorized.push(bookmark);
+        }
+      } else {
+        result.uncategorized.push(bookmark);
+      }
+    }
+
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
+    return result;
+  }, [scheduleSync]);
+
   return (
     <CategoriesContext.Provider value={{
       categories, loading,
       addSite, editSite, deleteSite, moveSite,
       addCategory, editCategory, deleteCategory, reorderCategories,
       replaceAll, save,
+      importBookmarks,
     }}>
       {children}
     </CategoriesContext.Provider>

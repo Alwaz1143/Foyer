@@ -21,3 +21,11 @@ firestore-debug.log
 
 # Next.js
 .next/
+
+# TypeScript
+tsconfig.tsbuildinfo
+
+# Extension (WXT)
+extension/.output/
+extension/.wxt/
+extension/node_modules/

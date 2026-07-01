@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "ext:icons": "cd extension && node scripts/generate-icons.mjs",
+    "ext:build": "cd extension && npm run build",
+    "ext:dev": "cd extension && npm run dev"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.5.1",

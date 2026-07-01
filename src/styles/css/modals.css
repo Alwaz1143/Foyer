@@ -148,3 +148,66 @@
     text-transform: none;
     text-align: center;
 }
+
+/* Import Modal */
+.import-modal-content {
+    max-width: 640px;
+}
+
+.import-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.import-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+    border-bottom: 2px solid var(--input-border);
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+}
+
+.import-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    color: var(--text-color);
+}
+
+.import-title {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.import-category {
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.confidence-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.confidence-high { background: rgba(0, 200, 83, 0.12); color: #00c853; }
+.confidence-medium { background: rgba(255, 193, 7, 0.15); color: #f59e0b; }
+.confidence-low { background: rgba(255, 152, 0, 0.12); color: #e65100; }
+.confidence-none { background: rgba(0, 0, 0, 0.05); color: rgba(0, 0, 0, 0.4); }
+
+/* Detect hint in add-site form */
+.detect-hint {
+    font-size: 12px;
+    color: var(--accent-primary);
+    margin-top: 6px;
+    min-height: 18px;
+    font-weight: 500;
+}
