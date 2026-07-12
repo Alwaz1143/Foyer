@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,8 @@ import type { ParsedBookmark } from "@/lib/types";
 import { UNSPLASH_CONFIG } from "@/lib/constants";
 import { showToast } from "@/lib/toast";
 import { foyerKey } from "@/lib/storage";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import ShortcutGrid from "@/components/ShortcutGrid";
 
 function closeModal(id: string) {
@@ -26,6 +28,7 @@ export default function HomePage() {
   const router = useRouter();
   const uidRef = useRef<string | null>(null);
   uidRef.current = user?.uid ?? null;
+  const [showUncategorizedActions, setShowUncategorizedActions] = useState(false);
   const { toggleWallpaper } = useWallpaper();
   const { connected, startOAuth } = useUnsplash();
   useSearch();
@@ -470,7 +473,13 @@ export default function HomePage() {
       let summary = `✅ Added <strong>${result.added}</strong> bookmarks`;
       if (result.skipped > 0) summary += `, skipped <strong>${result.skipped}</strong> duplicates`;
       if (result.createdCategories.length > 0) summary += `<br>📁 Created sections: <strong>${result.createdCategories.join(", ")}</strong>`;
-      if (result.uncategorized.length > 0) summary += `<br>⚠️ <strong>${result.uncategorized.length}</strong> bookmarks could not be categorized`;
+      if (result.uncategorized.length > 0 && !autoCreate) {
+        summary += `<br>⚠️ <strong>${result.uncategorized.length}</strong> bookmarks could not be categorized`;
+        (window as any).__uncategorizedBookmarks = result.uncategorized;
+        setShowUncategorizedActions(true);
+      } else if (result.uncategorized.length > 0) {
+        summary += `<br>⚠️ <strong>${result.uncategorized.length}</strong> bookmarks could not be categorized`;
+      }
       document.getElementById("importDoneSummary")!.innerHTML = summary;
 
       showToast(`Imported ${result.added} bookmarks!`);
@@ -493,9 +502,106 @@ export default function HomePage() {
     };
   }, [importBookmarks]);
 
+  // First-login prompt button handlers
+  useEffect(() => {
+    const closePromptModal = () => {
+      const modal = document.getElementById("bookmarkImportPromptModal");
+      if (modal) modal.style.display = "none";
+    };
+
+    const maybeLaterBtn = document.getElementById("maybeLaterPromptBtn");
+    const importNowBtn = document.getElementById("importNowPromptBtn");
+    const closeBtn = document.getElementById("closeBookmarkPromptBtn");
+
+    const markPromptShown = async () => {
+      if (!user) return;
+      try {
+        await setDoc(doc(db, "users", user.uid), { settings: { bookmarkImportPromptShown: true } }, { merge: true });
+      } catch {
+        // Silently fail
+      }
+    };
+
+    const handleMaybeLater = () => {
+      closePromptModal();
+      markPromptShown();
+    };
+
+    const handleImportNow = () => {
+      closePromptModal();
+      markPromptShown();
+      const m = document.getElementById("importBookmarksModal");
+      if (m) m.style.display = "flex";
+    };
+
+    maybeLaterBtn?.addEventListener("click", handleMaybeLater);
+    importNowBtn?.addEventListener("click", handleImportNow);
+    closeBtn?.addEventListener("click", handleMaybeLater);
+
+    return () => {
+      maybeLaterBtn?.removeEventListener("click", handleMaybeLater);
+      importNowBtn?.removeEventListener("click", handleImportNow);
+      closeBtn?.removeEventListener("click", handleMaybeLater);
+    };
+  }, [user]);
+
+  // Uncategorized import action buttons
+  useEffect(() => {
+    const createBtn = document.getElementById("createSectionsBtn");
+    const addBtn = document.getElementById("addUncategorizedBtn");
+    const skipBtn = document.getElementById("skipUncategorizedBtn");
+
+    const handleCreateSections = () => {
+      const uncategorized = (window as any).__uncategorizedBookmarks as any[] | undefined;
+      (window as any).__uncategorizedBookmarks = undefined;
+      setShowUncategorizedActions(false);
+      if (!uncategorized || uncategorized.length === 0) return;
+      const result = importBookmarks(uncategorized, { autoCreateCategories: true });
+      const summary = document.getElementById("importDoneSummary")!;
+      summary.innerHTML += `<br>📁 Created sections: <strong style="color:var(--accent-color)">${result.createdCategories.join(", ")}</strong>`;
+      showToast(`Organized ${result.added} uncategorized bookmarks into sections!`);
+    };
+
+    const handleAddToCategory = () => {
+      const uncategorized = (window as any).__uncategorizedBookmarks as any[] | undefined;
+      (window as any).__uncategorizedBookmarks = undefined;
+      setShowUncategorizedActions(false);
+      if (!uncategorized || uncategorized.length === 0) return;
+      const select = document.getElementById("uncategorizedCategorySelect") as HTMLSelectElement | null;
+      const categoryId = select?.value;
+      if (!categoryId) {
+        showToast("Please select a category first.", "error");
+        return;
+      }
+      let added = 0;
+      for (const b of uncategorized) {
+        addSite(b.title, b.url, categoryId, b.icon);
+        added++;
+      }
+      const summary = document.getElementById("importDoneSummary")!;
+      summary.innerHTML += `<br>➕ Added <strong>${added}</strong> uncategorized bookmarks to selected section`;
+      showToast(`Added ${added} bookmarks!`);
+    };
+
+    const handleSkip = () => {
+      (window as any).__uncategorizedBookmarks = undefined;
+      setShowUncategorizedActions(false);
+    };
+
+    createBtn?.addEventListener("click", handleCreateSections);
+    addBtn?.addEventListener("click", handleAddToCategory);
+    skipBtn?.addEventListener("click", handleSkip);
+
+    return () => {
+      createBtn?.removeEventListener("click", handleCreateSections);
+      addBtn?.removeEventListener("click", handleAddToCategory);
+      skipBtn?.removeEventListener("click", handleSkip);
+    };
+  }, [importBookmarks, addSite, setShowUncategorizedActions]);
+
   // Populate category dropdowns
   useEffect(() => {
-    ["siteCategory", "editSiteCategory"].forEach((selectId) => {
+    ["siteCategory", "editSiteCategory", "uncategorizedCategorySelect"].forEach((selectId) => {
       const sel = document.getElementById(selectId) as HTMLSelectElement | null;
       if (!sel) return;
       sel.innerHTML = "";
@@ -508,6 +614,29 @@ export default function HomePage() {
     });
   }, [categories]);
 
+  // First-login bookmark import prompt
+  useEffect(() => {
+    if (!user || categories.length === 0) return;
+
+    const promptShownRef = (window as any).__bookmarkPromptShown;
+    if (promptShownRef) return;
+
+    const checkPrompt = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const settings = userDoc.data()?.settings;
+        if (settings?.bookmarkImportPromptShown === true) return;
+
+        (window as any).__bookmarkPromptShown = true;
+        const modal = document.getElementById("bookmarkImportPromptModal");
+        if (modal) modal.style.display = "flex";
+      } catch {
+        // Silently fail
+      }
+    };
+    checkPrompt();
+  }, [user, categories]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -516,7 +645,7 @@ export default function HomePage() {
         (document.getElementById("unifiedSearchInput") as HTMLInputElement | null)?.focus();
       }
       if (e.key === "Escape") {
-        for (const id of ["addSiteModal", "editSiteModal", "sectionModal", "settingsModal"]) {
+        for (const id of ["addSiteModal", "editSiteModal", "sectionModal", "settingsModal", "bookmarkImportPromptModal"]) {
           const m = document.getElementById(id);
           if (m && m.style.display === "flex") { m.style.display = "none"; break; }
         }
@@ -746,12 +875,55 @@ export default function HomePage() {
             </div>
             <div id="importStepDone" style={{ display: "none" }}>
               <p id="importDoneSummary" style={{ color: "var(--text-color)", fontSize: 16, lineHeight: 1.6 }}></p>
+              {showUncategorizedActions && (
+                <div id="importUncategorizedActions" style={{ marginTop: 16, borderTop: "1px solid var(--input-border)", paddingTop: 16 }}>
+                  <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 12 }}>
+                    <i className="fas fa-question-circle" style={{ marginRight: 6 }}></i>
+                    Uncategorized bookmarks can be organized automatically:
+                  </p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <button type="button" className="btn-primary" id="createSectionsBtn">
+                      <i className="fas fa-layer-group" style={{ marginRight: 6 }}></i>Create sections by domain
+                    </button>
+                    <select id="uncategorizedCategorySelect" style={{
+                      padding: "10px 14px", border: "2px solid var(--input-border)", borderRadius: 12,
+                      background: "var(--input-bg)", color: "var(--input-text)", fontSize: 14, minWidth: 180,
+                      cursor: "pointer",
+                    }}></select>
+                    <button type="button" className="btn-secondary" id="addUncategorizedBtn">Add Here</button>
+                    <button type="button" className="btn-secondary" id="skipUncategorizedBtn" style={{ color: "var(--text-secondary)" }}>Skip</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="modal-actions" style={{ padding: "0 28px 24px" }}>
             <button type="button" className="btn-secondary" id="cancelImportBtn">Cancel</button>
             <button type="button" className="btn-primary" id="confirmImportBtn" style={{ display: "none" }}>Import</button>
             <button type="button" className="btn-primary" id="closeImportDoneBtn" style={{ display: "none" }}>Done</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="bookmarkImportPromptModal" className="modal">
+        <div className="modal-content" style={{ maxWidth: 440 }}>
+          <div className="modal-header">
+            <h2><i className="fas fa-bookmark" style={{ marginRight: 8, color: "var(--accent-color)" }}></i>Import Your Bookmarks?</h2>
+            <button className="close-btn" id="closeBookmarkPromptBtn" aria-label="Close">&times;</button>
+          </div>
+          <div className="modal-form">
+            <p style={{ color: "var(--text-color)", lineHeight: 1.6, marginBottom: 12 }}>
+              You can import bookmarks from your browser to organize them into sections on Foyer.
+            </p>
+            <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.5 }}>
+              Export your bookmarks as an HTML file from any browser, upload it here, and we'll automatically sort them.
+            </p>
+          </div>
+          <div className="modal-actions" style={{ padding: "0 28px 24px", gap: 10 }}>
+            <button type="button" className="btn-secondary" id="maybeLaterPromptBtn">Maybe Later</button>
+            <button type="button" className="btn-primary" id="importNowPromptBtn">
+              <i className="fas fa-upload" style={{ marginRight: 6 }}></i>Import Now
+            </button>
           </div>
         </div>
       </div>

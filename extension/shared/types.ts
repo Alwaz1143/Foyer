@@ -14,3 +14,51 @@ export interface Category {
   websites: Website[];
   orderIndex?: number;
 }
+
+export interface UserSettings {
+  wallpaperEnabled: boolean;
+  selectedSearchEngine: string;
+  lastWallpaperKeyword: string;
+  customWallpaperKeywords: string;
+  googleAiMode?: boolean;
+  bookmarkImportPromptShown?: boolean;
+}
+
+export interface UnsplashState {
+  accessToken: string;
+  username: string;
+  connectedAt?: string;
+  foyerCollectionId: string | null;
+}
+
+export interface ParsedBookmark {
+  title: string;
+  url: string;
+  addDate?: number;
+  folder?: string;
+  folderPath?: string[];
+  icon?: string;
+}
+
+export interface SearchEngine {
+  name: string;
+  /** Font Awesome class string e.g. "fab fa-google". Used when iconSvg is absent. */
+  icon: string;
+  /** Inline SVG HTML string for the selector button icon (overrides `icon`). */
+  iconSvg?: string;
+  color: string;
+  placeholder: string;
+  url: string;
+}
+
+interface UnsplashPhoto {
+  id: string;
+  photoUrl: string;
+  photographerName: string;
+  photographerUrl: string;
+}
+
+export interface CachedWallpaper extends UnsplashPhoto {
+  previewUrl: string;
+  highResUrl: string;
+}

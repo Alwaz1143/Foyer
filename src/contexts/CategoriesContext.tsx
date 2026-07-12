@@ -327,6 +327,65 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // When autoCreate is ON, handle uncategorized bookmarks by grouping by root domain
+    if (autoCreate && result.uncategorized.length > 0) {
+      const existingIds = new Set(next.map((c) => c.id));
+      const domainMap = new Map<string, ParsedBookmark[]>();
+      for (const b of result.uncategorized) {
+        const domain = getRootDomain(b.url);
+        if (!domainMap.has(domain)) domainMap.set(domain, []);
+        domainMap.get(domain)!.push(b);
+      }
+
+      const stillUncategorized: ParsedBookmark[] = [];
+      for (const [domain, domainBookmarks] of domainMap) {
+        if (domainBookmarks.length >= 3) {
+          const sectionName = domain.charAt(0).toUpperCase() + domain.slice(1);
+          const newId = generateCategoryId(sectionName, existingIds);
+          existingIds.add(newId);
+          const section: Category = {
+            id: newId,
+            name: sectionName,
+            icon: "🌐",
+            websites: domainBookmarks.map((b) => ({
+              id: generateSiteId(),
+              name: b.title,
+              url: b.url,
+              domain,
+              customIcon: b.icon || "",
+            })),
+          };
+          next.push(section);
+          result.added += domainBookmarks.length;
+          result.createdCategories.push(sectionName);
+        } else {
+          stillUncategorized.push(...domainBookmarks);
+        }
+      }
+
+      if (stillUncategorized.length > 0) {
+        const sectionName = "Uncategorized";
+        const newId = generateCategoryId(sectionName, existingIds);
+        const section: Category = {
+          id: newId,
+          name: sectionName,
+          icon: "📂",
+          websites: stillUncategorized.map((b) => ({
+            id: generateSiteId(),
+            name: b.title,
+            url: b.url,
+            domain: getRootDomain(b.url),
+            customIcon: b.icon || "",
+          })),
+        };
+        next.push(section);
+        result.added += stillUncategorized.length;
+        result.createdCategories.push(sectionName);
+      }
+
+      result.uncategorized = [];
+    }
+
     setCategories(next);
     localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
     scheduleSync(next);

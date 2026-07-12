@@ -215,3 +215,112 @@ body {
   margin-top: 1px;
   flex-shrink: 0;
 }
+
+/* ── Pending bookmark confirmation ────────────────────────────────── */
+
+.pending-counter {
+  font-size: 12px;
+  color: #888;
+  text-align: center;
+}
+
+.pending-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: #16213e;
+  border-radius: 8px;
+  border: 1px solid #2a2a4a;
+}
+
+.pending-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pending-card-url {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.confidence-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #0f3460;
+  border-radius: 6px;
+  border-left: 3px solid #4caf50;
+  font-size: 12px;
+  color: #ccc;
+  line-height: 1.4;
+}
+
+.confidence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.confidence-label {
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.pending-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pending-select-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.pending-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.pending-select:focus {
+  border-color: #e94560;
+}
+
+.pending-select option {
+  background: #16213e;
+  color: #e0e0e0;
+}
+
+.pending-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-secondary {
+  background: #2a2a4a;
+  color: #e0e0e0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #3a3a5a;
+}

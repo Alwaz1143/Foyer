@@ -21,6 +21,7 @@ export interface UserSettings {
   lastWallpaperKeyword: string;
   customWallpaperKeywords: string;
   googleAiMode?: boolean;
+  bookmarkImportPromptShown?: boolean;
 }
 
 export interface UnsplashState {

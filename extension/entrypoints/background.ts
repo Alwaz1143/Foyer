@@ -2,6 +2,7 @@ import { defineBackground } from "wxt/sandbox";
 import { onUserChanged } from "../lib/auth";
 import { getCategories, addSiteToCategory } from "../lib/firestore";
 import { classifySite } from "../shared/classifySite";
+import type { ClassificationResult } from "../shared/classifySite";
 import { normalizeUrl } from "../shared/normalizeUrl";
 import { getRootDomain, generateSiteId } from "../shared/utils";
 import type { Category, Website } from "../shared/types";
@@ -14,6 +15,14 @@ interface QueuedBookmark {
   title: string;
   url: string;
   folderHint?: string;
+}
+
+interface PendingBookmark {
+  title: string;
+  url: string;
+  folderHint?: string;
+  classification: ClassificationResult;
+  timestamp: number;
 }
 
 let currentUser: { uid: string } | null = null;
@@ -44,41 +53,50 @@ async function refreshCategories(): Promise<void> {
   }
 }
 
-function findOrCreateMatchingCategory(siteName: string, siteUrl: string, folderHint?: string): string | null {
-  const result = classifySite(siteName, siteUrl, cachedCategories, folderHint);
-  if (result.categoryId) return result.categoryId;
-  return null;
-}
-
 async function addBookmarkToFoyer(
   title: string,
   url: string,
   folderHint?: string
-): Promise<{ added: boolean; categoryName?: string }> {
-  if (!currentUser) return { added: false };
+): Promise<{
+  added: boolean;
+  alreadyExists: boolean;
+  categoryName?: string;
+  classification: ClassificationResult;
+}> {
+  const classification = classifySite(title, url, cachedCategories, folderHint);
 
+  if (!currentUser) {
+    return { added: false, alreadyExists: false, classification };
+  }
+
+  // Dedup check
   const normalizedUrl = normalizeUrl(url);
-
   for (const cat of cachedCategories) {
     for (const site of cat.websites) {
       if (normalizeUrl(site.url) === normalizedUrl) {
-        return { added: false };
+        return { added: false, alreadyExists: true, classification };
       }
     }
   }
 
-  const categoryId = findOrCreateMatchingCategory(title, url, folderHint);
-  if (!categoryId) return { added: false };
+  if (!classification.categoryId) {
+    return { added: false, alreadyExists: false, classification };
+  }
 
   const domain = getRootDomain(url);
   const site: Website = { id: generateSiteId(), name: title, url, domain };
 
   try {
-    await addSiteToCategory(currentUser.uid, categoryId, site);
+    await addSiteToCategory(currentUser.uid, classification.categoryId, site);
     await refreshCategories();
-    return { added: true, categoryName: cachedCategories.find(c => c.id === categoryId)?.name };
+    return {
+      added: true,
+      alreadyExists: false,
+      categoryName: cachedCategories.find(c => c.id === classification.categoryId)?.name,
+      classification,
+    };
   } catch {
-    return { added: false };
+    return { added: false, alreadyExists: false, classification };
   }
 }
 
@@ -109,6 +127,38 @@ async function updateBadge(count: number) {
   await chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
 }
 
+// ── Pending bookmark storage ────────────────────────────────────────────────
+
+async function storePendingBookmark(pending: PendingBookmark): Promise<void> {
+  const result = await chrome.storage.local.get("pendingBookmarks");
+  const list: PendingBookmark[] = result.pendingBookmarks || [];
+  list.push(pending);
+  await chrome.storage.local.set({ pendingBookmarks: list });
+  await chrome.action.setBadgeText({ text: "!" });
+  await chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
+  await chrome.action.setTitle({
+    title: `${list.length} bookmark${list.length > 1 ? "s" : ""} awaiting confirmation`,
+  });
+}
+
+async function clearPendingBookmark(index: number): Promise<void> {
+  const result = await chrome.storage.local.get("pendingBookmarks");
+  const list: PendingBookmark[] = result.pendingBookmarks || [];
+  if (index < 0 || index >= list.length) return;
+  list.splice(index, 1);
+  if (list.length > 0) {
+    await chrome.storage.local.set({ pendingBookmarks: list });
+    await chrome.action.setBadgeText({ text: "!" });
+    await chrome.action.setTitle({
+      title: `${list.length} bookmark${list.length > 1 ? "s" : ""} awaiting confirmation`,
+    });
+  } else {
+    await chrome.storage.local.remove("pendingBookmarks");
+    await chrome.action.setBadgeText({ text: "" });
+    await chrome.action.setTitle({ title: "Foyer" });
+  }
+}
+
 // ── Phase 2: Native ★ Bookmark Interception ──────────────────────────────────
 
 async function onBookmarkCreated(id: string, bookmark: chrome.bookmarks.BookmarkTreeNode) {
@@ -131,11 +181,23 @@ async function onBookmarkCreated(id: string, bookmark: chrome.bookmarks.Bookmark
   }
 
   const result = await addBookmarkToFoyer(bookmark.title, bookmark.url, folderName);
+
   if (result.added) {
+    // High confidence silent add
     const prev = await chrome.action.getBadgeText({});
     const count = (parseInt(prev || "0") + 1).toString();
     await chrome.action.setBadgeText({ text: count });
     await chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
+    await chrome.action.setTitle({ title: `Added to ${result.categoryName || "Foyer"}` });
+  } else if (!result.alreadyExists) {
+    // Not a duplicate — store as pending for user to confirm or classify
+    await storePendingBookmark({
+      title: bookmark.title,
+      url: bookmark.url,
+      folderHint: folderName,
+      classification: result.classification,
+      timestamp: Date.now(),
+    });
   }
 }
 
@@ -167,9 +229,6 @@ async function syncAllBookmarks() {
 
     let addedCount = 0;
     for (const bookmark of flat) {
-      const categoryId = findOrCreateMatchingCategory(bookmark.title, bookmark.url, bookmark.folder);
-      if (!categoryId) continue;
-
       const normalized = normalizeUrl(bookmark.url);
 
       let exists = false;
@@ -184,11 +243,14 @@ async function syncAllBookmarks() {
       }
       if (exists) continue;
 
+      const result = classifySite(bookmark.title, bookmark.url, cachedCategories, bookmark.folder);
+      if (!result.categoryId) continue;
+
       const domain = getRootDomain(bookmark.url);
       const site: Website = { id: generateSiteId(), name: bookmark.title, url: bookmark.url, domain };
 
       try {
-        await addSiteToCategory(currentUser.uid, categoryId, site);
+        await addSiteToCategory(currentUser.uid, result.categoryId, site);
         addedCount++;
       } catch { /* skip individual failures */ }
     }
@@ -253,7 +315,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         if (!tab?.url || !tab?.title) { sendResponse({ success: false, error: "no_tab" }); return; }
 
         const result = await addBookmarkToFoyer(tab.title, tab.url);
-        sendResponse({ success: true, ...result });
+        sendResponse({ success: true, added: result.added, categoryName: result.categoryName });
       })();
       return true;
     }
@@ -282,6 +344,78 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       mirrorDeletions = message.value;
       sendResponse({ success: true });
       return;
+    }
+
+    case "GET_PENDING_BOOKMARKS": {
+      (async () => {
+        const result = await chrome.storage.local.get("pendingBookmarks");
+        sendResponse({ pendingBookmarks: result.pendingBookmarks || [] });
+      })();
+      return true;
+    }
+
+    case "CONFIRM_BOOKMARK": {
+      (async () => {
+        if (!currentUser) { sendResponse({ success: false, error: "not_signed_in" }); return; }
+        const { index, title, url, folderHint, categoryId } = message;
+        const classification = classifySite(title, url, cachedCategories, folderHint);
+
+        const targetId = categoryId || classification.categoryId;
+        if (!targetId) {
+          sendResponse({ success: false, error: "no_category" });
+          return;
+        }
+
+        const normalizedUrl = normalizeUrl(url);
+        let alreadyExists = false;
+        for (const cat of cachedCategories) {
+          for (const site of cat.websites) {
+            if (normalizeUrl(site.url) === normalizedUrl) {
+              alreadyExists = true;
+              break;
+            }
+          }
+          if (alreadyExists) break;
+        }
+
+        if (alreadyExists) {
+          await clearPendingBookmark(index);
+          sendResponse({ success: false, error: "already_exists" });
+          return;
+        }
+
+        const domain = getRootDomain(url);
+        const site: Website = { id: generateSiteId(), name: title, url, domain };
+
+        try {
+          await addSiteToCategory(currentUser.uid, targetId, site);
+          await refreshCategories();
+          await clearPendingBookmark(index);
+          const categoryName = cachedCategories.find(c => c.id === targetId)?.name;
+          sendResponse({ success: true, categoryName });
+        } catch {
+          sendResponse({ success: false, error: "write_failed" });
+        }
+      })();
+      return true;
+    }
+
+    case "SKIP_PENDING_BOOKMARK": {
+      (async () => {
+        await clearPendingBookmark(message.index);
+        sendResponse({ success: true });
+      })();
+      return true;
+    }
+
+    case "CLEAR_PENDING_BOOKMARKS": {
+      (async () => {
+        await chrome.storage.local.remove("pendingBookmarks");
+        await chrome.action.setBadgeText({ text: "" });
+        await chrome.action.setTitle({ title: "Foyer" });
+        sendResponse({ success: true });
+      })();
+      return true;
     }
   }
 });
