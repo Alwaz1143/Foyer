@@ -84,6 +84,20 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
     const catKey = foyerKey("categories", uid);
 
+    // ── Instant paint from localStorage ─────────────────────────────────────
+    // Show cached data immediately so the dashboard renders without waiting
+    // for Firestore network round-trips.
+    const cached = localStorage.getItem(catKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((c: any) => { if (!c.websites) c.websites = []; });
+          if (!cancelled) setCategories(parsed);
+        }
+      } catch { /* ignore */ }
+    }
+
     (async () => {
       try {
         const catsSnap = await getDocs(fsCollection(db, "users", uid, "categories"));
@@ -93,15 +107,24 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
           const sortedCats = catsSnap.docs
             .sort((a, b) => (a.data().orderIndex ?? 999) - (b.data().orderIndex ?? 999))
             .map((d) => ({ id: d.id, name: d.data().name, icon: d.data().icon }));
-          const loaded: Category[] = [];
-          for (const cat of sortedCats) {
-            const sitesSnap = await getDocs(fsCollection(db, "users", uid, "categories", cat.id, "websites"));
+
+          // ── Parallel fetch all websites ───────────────────────────────────
+          // Fire all subcollection queries simultaneously instead of N+1
+          // sequential round-trips.
+          const sitesResults = await Promise.all(
+            sortedCats.map((cat) =>
+              getDocs(fsCollection(db, "users", uid, "categories", cat.id, "websites"))
+            )
+          );
+          if (cancelled) return;
+
+          const loaded: Category[] = sortedCats.map((cat, i) => {
+            const sitesSnap = sitesResults[i];
             const sortedSites = sitesSnap.docs
               .sort((a, b) => (a.data().orderIndex ?? 999) - (b.data().orderIndex ?? 999))
               .map((s) => ({ id: s.id, name: s.data().name, url: s.data().url, domain: s.data().domain, customIcon: s.data().customIcon } as Website));
-            loaded.push({ id: cat.id, name: cat.name, icon: cat.icon || "", websites: sortedSites });
-          }
-          if (cancelled) return;
+            return { id: cat.id, name: cat.name, icon: cat.icon || "", websites: sortedSites };
+          });
 
           // ── Dedup pass ──────────────────────────────────────────────────
           // Firestore may have accumulated duplicate sites (same URL in the
