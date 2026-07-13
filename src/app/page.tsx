@@ -15,7 +15,7 @@ import { UNSPLASH_CONFIG } from "@/lib/constants";
 import { showToast } from "@/lib/toast";
 import { foyerKey } from "@/lib/storage";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import ShortcutGrid from "@/components/ShortcutGrid";
 
 function closeModal(id: string) {
@@ -504,100 +504,64 @@ export default function HomePage() {
 
   // First-login prompt button handlers
   useEffect(() => {
-    const closePromptModal = () => {
-      const modal = document.getElementById("bookmarkImportPromptModal");
-      if (modal) modal.style.display = "none";
-    };
-
+    const modal = document.getElementById("bookmarkImportPromptModal");
     const maybeLaterBtn = document.getElementById("maybeLaterPromptBtn");
     const importNowBtn = document.getElementById("importNowPromptBtn");
     const closeBtn = document.getElementById("closeBookmarkPromptBtn");
 
-    const markPromptShown = async () => {
+    const closePrompt = () => {
+      if (modal) modal.style.display = "none";
+    };
+
+    const markPermanent = async () => {
       if (!user) return;
       try {
-        await setDoc(doc(db, "users", user.uid), { settings: { bookmarkImportPromptShown: true } }, { merge: true });
+        await updateDoc(doc(db, "users", user.uid), {
+          "settings.bookmarkImportPromptShown": true,
+        });
       } catch {
-        // Silently fail
+        try {
+          await setDoc(doc(db, "users", user.uid), { settings: { bookmarkImportPromptShown: true } }, { merge: true });
+        } catch {
+          // Silently fail
+        }
       }
     };
 
     const handleMaybeLater = () => {
-      closePromptModal();
-      markPromptShown();
+      closePrompt();
     };
 
     const handleImportNow = () => {
-      closePromptModal();
-      markPromptShown();
+      closePrompt();
+      markPermanent();
       const m = document.getElementById("importBookmarksModal");
       if (m) m.style.display = "flex";
     };
 
+    const handleDismiss = () => {
+      closePrompt();
+      markPermanent();
+    };
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (modal && e.target === modal) {
+        handleDismiss();
+      }
+    };
+
     maybeLaterBtn?.addEventListener("click", handleMaybeLater);
     importNowBtn?.addEventListener("click", handleImportNow);
-    closeBtn?.addEventListener("click", handleMaybeLater);
+    closeBtn?.addEventListener("click", handleDismiss);
+    if (modal) modal.addEventListener("click", handleOutsideClick);
 
     return () => {
       maybeLaterBtn?.removeEventListener("click", handleMaybeLater);
       importNowBtn?.removeEventListener("click", handleImportNow);
-      closeBtn?.removeEventListener("click", handleMaybeLater);
+      closeBtn?.removeEventListener("click", handleDismiss);
+      if (modal) modal.removeEventListener("click", handleOutsideClick);
     };
   }, [user]);
-
-  // Uncategorized import action buttons
-  useEffect(() => {
-    const createBtn = document.getElementById("createSectionsBtn");
-    const addBtn = document.getElementById("addUncategorizedBtn");
-    const skipBtn = document.getElementById("skipUncategorizedBtn");
-
-    const handleCreateSections = () => {
-      const uncategorized = (window as any).__uncategorizedBookmarks as any[] | undefined;
-      (window as any).__uncategorizedBookmarks = undefined;
-      setShowUncategorizedActions(false);
-      if (!uncategorized || uncategorized.length === 0) return;
-      const result = importBookmarks(uncategorized, { autoCreateCategories: true });
-      const summary = document.getElementById("importDoneSummary")!;
-      summary.innerHTML += `<br>📁 Created sections: <strong style="color:var(--accent-color)">${result.createdCategories.join(", ")}</strong>`;
-      showToast(`Organized ${result.added} uncategorized bookmarks into sections!`);
-    };
-
-    const handleAddToCategory = () => {
-      const uncategorized = (window as any).__uncategorizedBookmarks as any[] | undefined;
-      (window as any).__uncategorizedBookmarks = undefined;
-      setShowUncategorizedActions(false);
-      if (!uncategorized || uncategorized.length === 0) return;
-      const select = document.getElementById("uncategorizedCategorySelect") as HTMLSelectElement | null;
-      const categoryId = select?.value;
-      if (!categoryId) {
-        showToast("Please select a category first.", "error");
-        return;
-      }
-      let added = 0;
-      for (const b of uncategorized) {
-        addSite(b.title, b.url, categoryId, b.icon);
-        added++;
-      }
-      const summary = document.getElementById("importDoneSummary")!;
-      summary.innerHTML += `<br>➕ Added <strong>${added}</strong> uncategorized bookmarks to selected section`;
-      showToast(`Added ${added} bookmarks!`);
-    };
-
-    const handleSkip = () => {
-      (window as any).__uncategorizedBookmarks = undefined;
-      setShowUncategorizedActions(false);
-    };
-
-    createBtn?.addEventListener("click", handleCreateSections);
-    addBtn?.addEventListener("click", handleAddToCategory);
-    skipBtn?.addEventListener("click", handleSkip);
-
-    return () => {
-      createBtn?.removeEventListener("click", handleCreateSections);
-      addBtn?.removeEventListener("click", handleAddToCategory);
-      skipBtn?.removeEventListener("click", handleSkip);
-    };
-  }, [importBookmarks, addSite, setShowUncategorizedActions]);
 
   // Populate category dropdowns
   useEffect(() => {
@@ -613,6 +577,39 @@ export default function HomePage() {
       });
     });
   }, [categories]);
+
+  // Uncategorized action button handlers
+  const handleCreateSections = () => {
+    const uncategorized = (window as any).__uncategorizedBookmarks as any[] | undefined;
+    (window as any).__uncategorizedBookmarks = undefined;
+    setShowUncategorizedActions(false);
+    if (!uncategorized || uncategorized.length === 0) return;
+    const result = importBookmarks(uncategorized, { autoCreateCategories: true });
+    const summary = document.getElementById("importDoneSummary")!;
+    summary.innerHTML += `<br>📁 Created sections: <strong style="color:var(--accent-color)">${result.createdCategories.join(", ")}</strong>`;
+    showToast(`Organized ${result.added} uncategorized bookmarks into sections!`);
+  };
+
+  const handleAddToCategory = () => {
+    const uncategorized = (window as any).__uncategorizedBookmarks as any[] | undefined;
+    (window as any).__uncategorizedBookmarks = undefined;
+    setShowUncategorizedActions(false);
+    if (!uncategorized || uncategorized.length === 0) return;
+    const select = document.getElementById("uncategorizedCategorySelect") as HTMLSelectElement | null;
+    const categoryId = select?.value;
+    if (!categoryId) {
+      showToast("Please select a category first.", "error");
+      return;
+    }
+    let added = 0;
+    for (const b of uncategorized) {
+      addSite(b.title, b.url, categoryId, b.icon);
+      added++;
+    }
+    const summary = document.getElementById("importDoneSummary")!;
+    summary.innerHTML += `<br>➕ Added <strong>${added}</strong> uncategorized bookmarks to selected section`;
+    showToast(`Added ${added} bookmarks!`);
+  };
 
   // First-login bookmark import prompt
   useEffect(() => {
@@ -882,16 +879,19 @@ export default function HomePage() {
                     Uncategorized bookmarks can be organized automatically:
                   </p>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                    <button type="button" className="btn-primary" id="createSectionsBtn">
+                    <button type="button" className="btn-primary" id="createSectionsBtn"
+                      onClick={handleCreateSections}>
                       <i className="fas fa-layer-group" style={{ marginRight: 6 }}></i>Create sections by domain
                     </button>
-                    <select id="uncategorizedCategorySelect" style={{
-                      padding: "10px 14px", border: "2px solid var(--input-border)", borderRadius: 12,
-                      background: "var(--input-bg)", color: "var(--input-text)", fontSize: 14, minWidth: 180,
-                      cursor: "pointer",
-                    }}></select>
-                    <button type="button" className="btn-secondary" id="addUncategorizedBtn">Add Here</button>
-                    <button type="button" className="btn-secondary" id="skipUncategorizedBtn" style={{ color: "var(--text-secondary)" }}>Skip</button>
+                    <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
+                      <select id="uncategorizedCategorySelect" style={{
+                        padding: "10px 14px", border: "2px solid var(--input-border)", borderRadius: 12,
+                        background: "var(--input-bg)", color: "var(--input-text)", fontSize: 14, minWidth: 180,
+                        cursor: "pointer",
+                      }}></select>
+                      <button type="button" className="btn-secondary" id="addUncategorizedBtn"
+                        onClick={handleAddToCategory}>Add Here</button>
+                    </div>
                   </div>
                 </div>
               )}
