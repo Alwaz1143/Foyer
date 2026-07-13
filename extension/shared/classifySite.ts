@@ -18,11 +18,16 @@ function matchCategoryByName(
   categories: Category[]
 ): Category | null {
   const lower = search.toLowerCase().trim();
+  if (lower.length < 3) return null;
+  const searchWords = lower.split(/[\s\-_/]+/).filter(Boolean);
   for (const cat of categories) {
     const name = cat.name.toLowerCase().trim();
-    if (name.includes(lower) || lower.includes(name)) return cat;
+    const nameWords = name.split(/[\s\-_/]+/);
+    if (searchWords.some((sw) => nameWords.some((nw) => nw === sw))) return cat;
+    if (lower.length >= 4 && nameWords.some((nw) => nw.includes(lower))) return cat;
     const noIcon = name.replace(/[^\w\s-]/g, "").trim();
-    if (noIcon.includes(lower) || lower.includes(noIcon)) return cat;
+    const noIconWords = noIcon.split(/[\s\-_/]+/);
+    if (searchWords.some((sw) => noIconWords.some((nw) => nw === sw))) return cat;
   }
   return null;
 }

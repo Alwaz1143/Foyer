@@ -129,11 +129,30 @@ async function updateBadge(count: number) {
 
 // ── Pending bookmark storage ────────────────────────────────────────────────
 
+let pendingCache: PendingBookmark[] | null = null;
+
+async function getPendingList(): Promise<PendingBookmark[]> {
+  if (pendingCache === null) {
+    const result = await chrome.storage.local.get("pendingBookmarks");
+    pendingCache = result.pendingBookmarks || [];
+  }
+  return pendingCache;
+}
+
+async function flushPendingCache(): Promise<void> {
+  if (pendingCache !== null) {
+    if (pendingCache.length > 0) {
+      await chrome.storage.local.set({ pendingBookmarks: pendingCache });
+    } else {
+      await chrome.storage.local.remove("pendingBookmarks");
+    }
+  }
+}
+
 async function storePendingBookmark(pending: PendingBookmark): Promise<void> {
-  const result = await chrome.storage.local.get("pendingBookmarks");
-  const list: PendingBookmark[] = result.pendingBookmarks || [];
+  const list = await getPendingList();
   list.push(pending);
-  await chrome.storage.local.set({ pendingBookmarks: list });
+  await flushPendingCache();
   await chrome.action.setBadgeText({ text: "!" });
   await chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
   await chrome.action.setTitle({
@@ -142,17 +161,17 @@ async function storePendingBookmark(pending: PendingBookmark): Promise<void> {
 }
 
 async function clearPendingBookmark(index: number): Promise<void> {
-  const result = await chrome.storage.local.get("pendingBookmarks");
-  const list: PendingBookmark[] = result.pendingBookmarks || [];
+  const list = await getPendingList();
   if (index < 0 || index >= list.length) return;
   list.splice(index, 1);
   if (list.length > 0) {
-    await chrome.storage.local.set({ pendingBookmarks: list });
+    await flushPendingCache();
     await chrome.action.setBadgeText({ text: "!" });
     await chrome.action.setTitle({
       title: `${list.length} bookmark${list.length > 1 ? "s" : ""} awaiting confirmation`,
     });
   } else {
+    pendingCache = [];
     await chrome.storage.local.remove("pendingBookmarks");
     await chrome.action.setBadgeText({ text: "" });
     await chrome.action.setTitle({ title: "Foyer" });
@@ -162,8 +181,12 @@ async function clearPendingBookmark(index: number): Promise<void> {
 // ── Phase 2: Native ★ Bookmark Interception ──────────────────────────────────
 
 async function onBookmarkCreated(id: string, bookmark: chrome.bookmarks.BookmarkTreeNode) {
-  if (!bookmark.url || syncInProgress) return;
+  if (!bookmark.url) return;
   if (!bookmark.url.startsWith("http")) return;
+  if (syncInProgress) {
+    queueBookmark(bookmark.title, bookmark.url);
+    return;
+  }
 
   let folderName: string | undefined;
   if (bookmark.parentId) {
@@ -263,6 +286,7 @@ async function syncAllBookmarks() {
     }
   } finally {
     syncInProgress = false;
+    flushBookmarkQueue();
   }
 }
 
@@ -316,7 +340,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         const result = await addBookmarkToFoyer(tab.title, tab.url);
         sendResponse({ success: true, added: result.added, categoryName: result.categoryName });
-      })();
+      })().catch((err) => console.error("Foyer: ADD_CURRENT_PAGE handler error:", err));
       return true;
     }
 
@@ -326,7 +350,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         await refreshCategories();
         await syncAllBookmarks();
         sendResponse({ success: true });
-      })();
+      })().catch((err) => console.error("Foyer: SYNC_ALL_BOOKMARKS handler error:", err));
       return true;
     }
 
@@ -348,9 +372,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case "GET_PENDING_BOOKMARKS": {
       (async () => {
-        const result = await chrome.storage.local.get("pendingBookmarks");
-        sendResponse({ pendingBookmarks: result.pendingBookmarks || [] });
-      })();
+        const list = await getPendingList();
+        sendResponse({ pendingBookmarks: list });
+      })().catch((err) => console.error("Foyer: GET_PENDING_BOOKMARKS handler error:", err));
       return true;
     }
 
@@ -396,7 +420,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         } catch {
           sendResponse({ success: false, error: "write_failed" });
         }
-      })();
+      })().catch((err) => console.error("Foyer: CONFIRM_BOOKMARK handler error:", err));
       return true;
     }
 
@@ -404,7 +428,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       (async () => {
         await clearPendingBookmark(message.index);
         sendResponse({ success: true });
-      })();
+      })().catch((err) => console.error("Foyer: SKIP_PENDING_BOOKMARK handler error:", err));
       return true;
     }
 
@@ -414,7 +438,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         await chrome.action.setBadgeText({ text: "" });
         await chrome.action.setTitle({ title: "Foyer" });
         sendResponse({ success: true });
-      })();
+      })().catch((err) => console.error("Foyer: CLEAR_PENDING_BOOKMARKS handler error:", err));
       return true;
     }
   }

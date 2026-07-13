@@ -286,7 +286,6 @@ export const domainCategoryMap: Record<string, string[]> = {
   "hotels.com":         ["Travel", "Trips"],
   "expedia.com":        ["Travel", "Trips"],
   "skyscanner.net":     ["Travel", "Trips"],
-  "google.com/travel":  ["Travel", "Trips"],
   "tripadvisor.com":    ["Travel", "Trips"],
   "uber.com":           ["Travel", "Transport"],
   "lyft.com":           ["Travel", "Transport"],
@@ -298,7 +297,6 @@ export const domainCategoryMap: Record<string, string[]> = {
   "strava.com":         ["Health", "Fitness"],
   "myfitnesspal.com":   ["Health", "Fitness", "Nutrition"],
   "fitbit.com":         ["Health", "Fitness"],
-  "nike.com/run":       ["Health", "Fitness"],
   "headspace.com":      ["Health", "Wellness", "Mental Health"],
   "calm.com":           ["Health", "Wellness", "Mental Health"],
 

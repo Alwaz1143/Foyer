@@ -9,6 +9,7 @@ import { useUnsplash } from "@/hooks/useUnsplash";
 import { useSearch } from "@/hooks/useSearch";
 import { useCategories } from "@/contexts/CategoriesContext";
 import { classifySite } from "@/lib/classifySite";
+import { getRootDomain } from "@/lib/utils";
 import { parseBookmarkHtml } from "@/lib/bookmarkParser";
 import type { ParsedBookmark } from "@/lib/types";
 import { UNSPLASH_CONFIG } from "@/lib/constants";
@@ -205,7 +206,7 @@ export default function HomePage() {
       const name = (document.getElementById("editSiteName") as HTMLInputElement)?.value.trim();
       const url = (document.getElementById("editSiteUrl") as HTMLInputElement)?.value.trim();
       if (!name || !url) return;
-      const domain = extractDomain(url);
+      const domain = getRootDomain(url);
 
       const catSelect = document.getElementById("editSiteCategory") as HTMLSelectElement | null;
       if (catSelect) {
@@ -373,6 +374,8 @@ export default function HomePage() {
     let parsedBookmarks: ParsedBookmark[] = [];
 
     const resetModal = () => {
+      (window as any).__uncategorizedBookmarks = undefined;
+      setShowUncategorizedActions(false);
       document.getElementById("importStepUpload")!.style.display = "";
       document.getElementById("importStepPreview")!.style.display = "none";
       document.getElementById("importStepDone")!.style.display = "none";
@@ -502,66 +505,42 @@ export default function HomePage() {
     };
   }, [importBookmarks]);
 
-  // First-login prompt button handlers
-  useEffect(() => {
+  // First-login prompt handlers
+  const markPermanent = async () => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        "settings.bookmarkImportPromptShown": true,
+      });
+    } catch {
+      // Silently fail — user will be prompted again next time
+    }
+  };
+
+  const handlePromptMaybeLater = () => {
     const modal = document.getElementById("bookmarkImportPromptModal");
-    const maybeLaterBtn = document.getElementById("maybeLaterPromptBtn");
-    const importNowBtn = document.getElementById("importNowPromptBtn");
-    const closeBtn = document.getElementById("closeBookmarkPromptBtn");
+    if (modal) modal.style.display = "none";
+  };
 
-    const closePrompt = () => {
-      if (modal) modal.style.display = "none";
-    };
+  const handlePromptDismiss = () => {
+    const modal = document.getElementById("bookmarkImportPromptModal");
+    if (modal) modal.style.display = "none";
+    markPermanent();
+  };
 
-    const markPermanent = async () => {
-      if (!user) return;
-      try {
-        await updateDoc(doc(db, "users", user.uid), {
-          "settings.bookmarkImportPromptShown": true,
-        });
-      } catch {
-        try {
-          await setDoc(doc(db, "users", user.uid), { settings: { bookmarkImportPromptShown: true } }, { merge: true });
-        } catch {
-          // Silently fail
-        }
-      }
-    };
+  const handlePromptImportNow = () => {
+    const modal = document.getElementById("bookmarkImportPromptModal");
+    if (modal) modal.style.display = "none";
+    markPermanent();
+    const importModal = document.getElementById("importBookmarksModal");
+    if (importModal) importModal.style.display = "flex";
+  };
 
-    const handleMaybeLater = () => {
-      closePrompt();
-    };
-
-    const handleImportNow = () => {
-      closePrompt();
-      markPermanent();
-      const m = document.getElementById("importBookmarksModal");
-      if (m) m.style.display = "flex";
-    };
-
-    const handleDismiss = () => {
-      closePrompt();
-      markPermanent();
-    };
-
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (modal && e.target === modal) {
-        handleDismiss();
-      }
-    };
-
-    maybeLaterBtn?.addEventListener("click", handleMaybeLater);
-    importNowBtn?.addEventListener("click", handleImportNow);
-    closeBtn?.addEventListener("click", handleDismiss);
-    if (modal) modal.addEventListener("click", handleOutsideClick);
-
-    return () => {
-      maybeLaterBtn?.removeEventListener("click", handleMaybeLater);
-      importNowBtn?.removeEventListener("click", handleImportNow);
-      closeBtn?.removeEventListener("click", handleDismiss);
-      if (modal) modal.removeEventListener("click", handleOutsideClick);
-    };
-  }, [user]);
+  const handlePromptBackdrop = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      handlePromptDismiss();
+    }
+  };
 
   // Populate category dropdowns
   useEffect(() => {
@@ -614,13 +593,16 @@ export default function HomePage() {
   // First-login bookmark import prompt
   useEffect(() => {
     if (!user || categories.length === 0) return;
+    let cancelled = false;
 
     const promptShownRef = (window as any).__bookmarkPromptShown;
     if (promptShownRef) return;
 
     const checkPrompt = async () => {
+      if (cancelled) return;
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (cancelled) return;
         const settings = userDoc.data()?.settings;
         if (settings?.bookmarkImportPromptShown === true) return;
 
@@ -632,6 +614,7 @@ export default function HomePage() {
       }
     };
     checkPrompt();
+    return () => { cancelled = true; };
   }, [user, categories]);
 
   // Keyboard shortcuts
@@ -905,11 +888,11 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div id="bookmarkImportPromptModal" className="modal">
+      <div id="bookmarkImportPromptModal" className="modal" onClick={handlePromptBackdrop}>
         <div className="modal-content" style={{ maxWidth: 440 }}>
           <div className="modal-header">
             <h2><i className="fas fa-bookmark" style={{ marginRight: 8, color: "var(--accent-color)" }}></i>Import Your Bookmarks?</h2>
-            <button className="close-btn" id="closeBookmarkPromptBtn" aria-label="Close">&times;</button>
+            <button className="close-btn" id="closeBookmarkPromptBtn" aria-label="Close" onClick={handlePromptDismiss}>&times;</button>
           </div>
           <div className="modal-form">
             <p style={{ color: "var(--text-color)", lineHeight: 1.6, marginBottom: 12 }}>
@@ -920,8 +903,8 @@ export default function HomePage() {
             </p>
           </div>
           <div className="modal-actions" style={{ padding: "0 28px 24px", gap: 10 }}>
-            <button type="button" className="btn-secondary" id="maybeLaterPromptBtn">Maybe Later</button>
-            <button type="button" className="btn-primary" id="importNowPromptBtn">
+            <button type="button" className="btn-secondary" id="maybeLaterPromptBtn" onClick={handlePromptMaybeLater}>Maybe Later</button>
+            <button type="button" className="btn-primary" id="importNowPromptBtn" onClick={handlePromptImportNow}>
               <i className="fas fa-upload" style={{ marginRight: 6 }}></i>Import Now
             </button>
           </div>
@@ -947,10 +930,4 @@ export default function HomePage() {
   );
 }
 
-function extractDomain(url: string): string {
-  try {
-    return new URL(url.startsWith("http") ? url : `https://${url}`).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
+

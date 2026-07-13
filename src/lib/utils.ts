@@ -1,5 +1,28 @@
 import type { Category } from "./types";
 
+const TWO_PART_TLDS = new Set([
+  "co.uk", "com.au", "co.in", "co.nz", "co.jp", "co.kr",
+  "co.za", "com.br", "org.uk", "ac.uk", "gov.uk",
+  "net.au", "org.au", "co.il", "co.id",
+  "co.th", "com.mx", "com.ar", "com.sg",
+  "or.jp", "ne.jp", "ac.jp", "go.jp",
+  "co.nz", "net.nz", "org.nz",
+  "co.za", "net.za", "org.za", "gov.za",
+  "co.in", "net.in", "org.in", "gov.in", "ac.in",
+]);
+
+function extractRoot(hostname: string): string {
+  const parts = hostname.split(".");
+  if (parts.length > 2) {
+    const lastTwo = parts.slice(-2).join(".");
+    if (TWO_PART_TLDS.has(lastTwo)) {
+      return parts.slice(-3).join(".");
+    }
+    return lastTwo;
+  }
+  return hostname;
+}
+
 export function getRootDomain(input: string): string {
   try {
     let hostname: string;
@@ -11,19 +34,11 @@ export function getRootDomain(input: string): string {
       hostname = input;
     }
     hostname = hostname.replace(/^www\./, "");
-    const parts = hostname.split(".");
-    if (parts.length > 2) {
-      return parts.slice(-2).join(".");
-    }
-    return hostname;
+    return extractRoot(hostname);
   } catch {
     let cleaned = input.replace(/^(https?:\/\/)?(www\.)?/, "");
     cleaned = cleaned.split("/")[0];
-    const parts = cleaned.split(".");
-    if (parts.length > 2) {
-      return parts.slice(-2).join(".");
-    }
-    return cleaned;
+    return extractRoot(cleaned);
   }
 }
 

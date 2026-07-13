@@ -6,7 +6,9 @@ export function normalizeUrl(url: string): string {
     }
     const parsed = new URL(normalized);
     parsed.hostname = parsed.hostname.replace(/^www\./, "").toLowerCase();
-    parsed.protocol = "https:";
+    if (!/^https?:\/\//i.test(url.trim())) {
+      parsed.protocol = "https:";
+    }
     let path = parsed.pathname.replace(/\/+$/, "");
     if (path === "") path = "/";
     parsed.pathname = path;

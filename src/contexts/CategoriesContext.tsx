@@ -24,7 +24,6 @@ interface CategoriesContextValue {
   deleteCategory: (catIndex: number) => void;
   reorderCategories: (fromIdx: number, toIdx: number) => void;
   replaceAll: (newCategories: Category[]) => void;
-  save: () => void;
   importBookmarks: (
     bookmarks: ParsedBookmark[],
     opts?: { autoCreateCategories?: boolean }
@@ -156,12 +155,6 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [user, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const persist = useCallback((newCats: Category[]) => {
-    setCategories(newCats);
-    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(newCats));
-    scheduleSync(newCats);
-  }, [scheduleSync]);
-
   const addSite = useCallback((name: string, url: string, categoryId: string, customIcon?: string) => {
     setCategories((prev) => {
       const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
@@ -253,14 +246,6 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(newCats));
     forceSync(newCats);
   }, [forceSync]);
-
-  const save = useCallback(() => {
-    setCategories((prev) => {
-      scheduleSync(prev);
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(prev));
-      return prev;
-    });
-  }, [scheduleSync]);
 
   const importBookmarks = useCallback((
     bookmarks: ParsedBookmark[],
@@ -388,16 +373,16 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
     setCategories(next);
     localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-    scheduleSync(next);
+    forceSync(next);
     return result;
-  }, [scheduleSync]);
+  }, [forceSync]);
 
   return (
     <CategoriesContext.Provider value={{
       categories, loading,
       addSite, editSite, deleteSite, moveSite,
       addCategory, editCategory, deleteCategory, reorderCategories,
-      replaceAll, save,
+      replaceAll,
       importBookmarks,
     }}>
       {children}
