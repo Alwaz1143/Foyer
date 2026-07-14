@@ -506,39 +506,38 @@ export default function HomePage() {
   }, [importBookmarks]);
 
   // First-login prompt handlers
-  const markPermanent = async () => {
+  const persistPromptDismissed = () => {
     if (!user) return;
+    localStorage.setItem(foyerKey("bookmarkImportPromptShown", user.uid), "true");
     try {
-      await updateDoc(doc(db, "users", user.uid), {
+      updateDoc(doc(db, "users", user.uid), {
         "settings.bookmarkImportPromptShown": true,
       });
-    } catch {
-      // Silently fail — user will be prompted again next time
-    }
+    } catch { /* best-effort */ }
   };
 
-  const handlePromptMaybeLater = () => {
+  const handlePromptLater = () => {
     const modal = document.getElementById("bookmarkImportPromptModal");
     if (modal) modal.style.display = "none";
   };
 
-  const handlePromptDismiss = () => {
+  const handleDontShowAgain = () => {
+    persistPromptDismissed();
     const modal = document.getElementById("bookmarkImportPromptModal");
     if (modal) modal.style.display = "none";
-    markPermanent();
   };
 
   const handlePromptImportNow = () => {
+    persistPromptDismissed();
     const modal = document.getElementById("bookmarkImportPromptModal");
     if (modal) modal.style.display = "none";
-    markPermanent();
     const importModal = document.getElementById("importBookmarksModal");
     if (importModal) importModal.style.display = "flex";
   };
 
   const handlePromptBackdrop = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      handlePromptDismiss();
+      handlePromptLater();
     }
   };
 
@@ -597,6 +596,9 @@ export default function HomePage() {
 
     const promptShownRef = (window as any).__bookmarkPromptShown;
     if (promptShownRef) return;
+
+    // Fast path — already dismissed permanently in this browser
+    if (localStorage.getItem(foyerKey("bookmarkImportPromptShown", user.uid)) === "true") return;
 
     const checkPrompt = async () => {
       if (cancelled) return;
@@ -892,7 +894,7 @@ export default function HomePage() {
         <div className="modal-content" style={{ maxWidth: 440 }}>
           <div className="modal-header">
             <h2><i className="fas fa-bookmark" style={{ marginRight: 8, color: "var(--accent-color)" }}></i>Import Your Bookmarks?</h2>
-            <button className="close-btn" id="closeBookmarkPromptBtn" aria-label="Close" onClick={handlePromptDismiss}>&times;</button>
+            <button className="close-btn" id="closeBookmarkPromptBtn" aria-label="Close" onClick={handlePromptLater}>&times;</button>
           </div>
           <div className="modal-form">
             <p style={{ color: "var(--text-color)", lineHeight: 1.6, marginBottom: 12 }}>
@@ -903,7 +905,7 @@ export default function HomePage() {
             </p>
           </div>
           <div className="modal-actions" style={{ padding: "0 28px 24px", gap: 10 }}>
-            <button type="button" className="btn-secondary" id="maybeLaterPromptBtn" onClick={handlePromptMaybeLater}>Maybe Later</button>
+            <button type="button" className="btn-secondary" id="dontShowAgainBtn" onClick={handleDontShowAgain}>Don't Show Again</button>
             <button type="button" className="btn-primary" id="importNowPromptBtn" onClick={handlePromptImportNow}>
               <i className="fas fa-upload" style={{ marginRight: 6 }}></i>Import Now
             </button>
