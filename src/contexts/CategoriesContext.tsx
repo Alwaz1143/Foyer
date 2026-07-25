@@ -153,23 +153,51 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
             await forceSync(deduped);
           }
         } else {
-          // First visit for this user — Firestore empty, seed defaults
+          // Firestore returned empty — could be a transient issue.
+          // Check localStorage first before assuming this is a new user.
+          const sentinelKey = foyerKey("defaultsSeeded", uid);
+          const local = localStorage.getItem(catKey);
+          if (local) {
+            try {
+              const parsed = JSON.parse(local);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                parsed.forEach((c: any) => { if (!c.websites) c.websites = []; });
+                if (cancelled) return;
+                setCategories(parsed);
+                localStorage.setItem(catKey, JSON.stringify(parsed));
+                initKnownIds(parsed);
+                await forceSync(parsed);
+                return;
+              }
+            } catch { /* ignore parse */ }
+          }
+          // Only seed defaults if no sentinel exists (prevents re-seeding
+          // after a previous seed on a different device or cleared cache).
+          if (localStorage.getItem(sentinelKey) === "true") return;
           const data: Category[] = JSON.parse(JSON.stringify(defaultCategories));
           data.forEach((c) => c.websites.forEach((s) => { if (!s.id) s.id = generateSiteId(); }));
           if (cancelled) return;
           setCategories(data);
-          localStorage.setItem(catKey, JSON.stringify(data));
+          if (!localStorage.getItem(catKey)) {
+            localStorage.setItem(catKey, JSON.stringify(data));
+          }
+          localStorage.setItem(sentinelKey, "true");
           initKnownIds(data);
           await forceSync(data);
         }
       } catch (err) {
         console.error("Firestore load failed, falling back to localStorage:", err);
         if (cancelled) return;
+        const sentinelKey = foyerKey("defaultsSeeded", uid);
         const local = localStorage.getItem(catKey) || localStorage.getItem("categories");
         if (local) {
           try { setCategories(JSON.parse(local)); } catch { /* ignore */ }
-        } else {
+        } else if (!localStorage.getItem(sentinelKey)) {
           setCategories(JSON.parse(JSON.stringify(defaultCategories)));
+          if (!localStorage.getItem(catKey)) {
+            localStorage.setItem(catKey, JSON.stringify(JSON.parse(JSON.stringify(defaultCategories))));
+          }
+          localStorage.setItem(sentinelKey, "true");
         }
       }
       if (!cancelled) setLoading(false);
