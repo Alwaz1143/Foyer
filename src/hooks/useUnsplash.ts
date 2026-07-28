@@ -92,10 +92,10 @@ export function useUnsplash() {
     } catch { /* ignore */ }
   }, [connected]);
 
-  // Re-evaluate heart whenever connected state changes (including on user switch)
+  // Re-evaluate heart state after every render (React may clear classList on re-render)
   useEffect(() => {
     refreshHeart();
-  }, [refreshHeart]);
+  });
 
   // Re-evaluate heart whenever a new photo is applied (fired by useWallpaper.applyPhoto)
   useEffect(() => {
