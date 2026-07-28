@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export interface CalendarDay {
   day: number;
@@ -9,20 +9,24 @@ export interface CalendarDay {
 }
 
 export function useCalendar() {
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [days, setDays] = useState<CalendarDay[]>([]);
   const [monthName, setMonthName] = useState("");
 
-  useEffect(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const today = now.getDate();
+  const buildCalendar = useCallback(() => {
+    const today = new Date().getDate();
+    const todayMonth = new Date().getMonth();
+    const todayYear = new Date().getFullYear();
 
-    setMonthName(now.toLocaleDateString([], { month: "long", year: "numeric" }));
+    setMonthName(
+      new Date(viewYear, viewMonth).toLocaleDateString([], { month: "long", year: "numeric" })
+    );
 
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const daysInPrev = new Date(year, month, 0).getDate();
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const daysInPrev = new Date(viewYear, viewMonth, 0).getDate();
 
     const result: CalendarDay[] = [];
 
@@ -31,7 +35,11 @@ export function useCalendar() {
     }
 
     for (let d = 1; d <= daysInMonth; d++) {
-      result.push({ day: d, currentMonth: true, today: d === today });
+      result.push({
+        day: d,
+        currentMonth: true,
+        today: d === today && viewMonth === todayMonth && viewYear === todayYear,
+      });
     }
 
     const remaining = 7 - (result.length % 7);
@@ -42,7 +50,31 @@ export function useCalendar() {
     }
 
     setDays(result);
+  }, [viewYear, viewMonth]);
+
+  useEffect(() => {
+    buildCalendar();
+  }, [buildCalendar]);
+
+  const prevMonth = useCallback(() => {
+    setViewMonth((m) => {
+      if (m === 0) {
+        setViewYear((y) => y - 1);
+        return 11;
+      }
+      return m - 1;
+    });
   }, []);
 
-  return { days, monthName };
+  const nextMonth = useCallback(() => {
+    setViewMonth((m) => {
+      if (m === 11) {
+        setViewYear((y) => y + 1);
+        return 0;
+      }
+      return m + 1;
+    });
+  }, []);
+
+  return { days, monthName, prevMonth, nextMonth };
 }

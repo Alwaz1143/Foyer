@@ -92,6 +92,29 @@
         max-height: 240px;
     }
 
+    .weather-forecast {
+        gap: 4px;
+        justify-content: flex-start;
+        padding-top: 2px;
+    }
+
+    .weather-forecast-day {
+        min-width: 42px;
+        padding: 4px 6px;
+    }
+
+    .forecast-day-name {
+        font-size: 11px;
+    }
+
+    .forecast-icon {
+        font-size: 17px;
+    }
+
+    .forecast-temps {
+        font-size: 12px;
+    }
+
     .widget {
         padding: 16px;
         border-radius: 16px;
@@ -326,35 +349,34 @@
         padding: 14px 12px;
     }
 
-    .weather-icon {
-        font-size: 28px;
+    .weather-main .weather-icon {
+        font-size: 25px;
     }
 
-    .weather-temp {
-        font-size: 22px;
+    .weather-main .weather-temp {
+        font-size: 23px;
     }
 
     .weather-condition {
+        font-size: 14px;
+    }
+
+    .weather-sub {
         font-size: 13px;
     }
 
-    .weather-feels {
+    .weather-meta {
         font-size: 12px;
-    }
-
-    .weather-hilo {
-        font-size: 12px;
-    }
-
-    .weather-extras {
-        gap: 8px;
-        flex-wrap: wrap;
-        font-size: 11px;
+        gap: 4px;
     }
 
     .weather-skeleton-icon {
         width: 28px;
         height: 28px;
+    }
+
+    .weather-forecast {
+        display: none;
     }
 
     .widget-news {
