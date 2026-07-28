@@ -96,6 +96,19 @@ export function useFirestoreSync() {
         localStorage.getItem(key) ??
         null;
 
+      const widgetKeys = ["clock", "calendar", "weather", "news", "search"];
+      const widgets: Record<string, boolean> = {};
+      widgetKeys.forEach((key) => {
+        const val = getLocal(`widget_${key}`);
+        widgets[key] = val !== null ? val === "true" : true;
+      });
+
+      const weatherLocationRaw = getLocal("weather_location");
+      let weatherLocation = null;
+      if (weatherLocationRaw) {
+        try { weatherLocation = JSON.parse(weatherLocationRaw); } catch { /* ignore */ }
+      }
+
       batch.set(doc(db, "users", uid), {
         settings: {
           wallpaperEnabled: getLocal("wallpaperEnabled") !== "false",
@@ -103,6 +116,8 @@ export function useFirestoreSync() {
           lastWallpaperKeyword: getLocal("lastWallpaperKeyword") || "",
           customWallpaperKeywords: getLocal("customWallpaperKeywords") || "",
           googleAiMode: getLocal("googleAiMode") === "true",
+          widgets,
+          weatherLocation,
         },
       }, { merge: true });
 

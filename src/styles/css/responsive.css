@@ -51,6 +51,47 @@
         min-width: 280px;
     }
 
+    .widgets-area {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto auto;
+        height: auto;
+        gap: 8px;
+    }
+
+    .clock-widget {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        text-align: center;
+        font-size: clamp(2.5rem, 8vw, 3.5rem);
+    }
+
+    .widget-calendar {
+        grid-column: 1;
+        grid-row: 2;
+        justify-self: stretch;
+        width: 100%;
+        max-width: none;
+    }
+
+    .widget-weather {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: stretch;
+        width: auto;
+        max-width: none;
+    }
+
+    .unified-search-widget {
+        grid-column: 1 / -1;
+        grid-row: 3;
+    }
+
+    .widget-news {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        max-height: 240px;
+    }
+
     .widget {
         padding: 16px;
         border-radius: 16px;
@@ -235,6 +276,121 @@
     
     .search-widgets {
         gap: 12px;
+    }
+
+    .widget-calendar {
+        width: 100%;
+        max-width: 100%;
+        padding: 12px;
+        gap: 8px;
+    }
+
+    .calendar-grid {
+        gap: 1px;
+    }
+
+    .calendar-day {
+        font-size: 11px;
+        width: 20px;
+        height: 20px;
+    }
+
+    .calendar-day-name {
+        font-size: 10px;
+    }
+
+    .calendar-month {
+        font-size: 13px;
+    }
+
+    .clock-widget {
+        font-size: clamp(1.6rem, 8vw, 2.2rem);
+    }
+
+    .widget-form {
+        gap: 6px;
+    }
+
+    .widget-input {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+
+    .widget-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+    }
+
+    .widget-weather {
+        padding: 14px 12px;
+    }
+
+    .weather-icon {
+        font-size: 28px;
+    }
+
+    .weather-temp {
+        font-size: 22px;
+    }
+
+    .weather-condition {
+        font-size: 13px;
+    }
+
+    .weather-feels {
+        font-size: 12px;
+    }
+
+    .weather-hilo {
+        font-size: 12px;
+    }
+
+    .weather-extras {
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 11px;
+    }
+
+    .weather-skeleton-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .widget-news {
+        padding: 12px 14px;
+        max-height: 200px;
+    }
+
+    .widget-news-header {
+        margin-bottom: 2px;
+    }
+
+    .widget-news-title {
+        font-size: 12px;
+    }
+
+    .news-text {
+        font-size: 12px;
+    }
+
+    .news-description {
+        font-size: 11px;
+    }
+
+    .news-bullet {
+        font-size: 6px;
+    }
+
+    .news-read-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .news-toggle {
+        padding: 8px;
+        font-size: 12px;
     }
 
     .shortcuts-grid {

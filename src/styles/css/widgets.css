@@ -414,3 +414,537 @@
 .widget-btn:active {
     transform: scale(0.95);
 }
+
+/* ============================================
+   Widgets Area — CSS Grid layout
+   ============================================ */
+.widgets-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 20px;
+    height: calc(100dvh - 120px);
+    margin-bottom: 40px;
+    align-items: start;
+}
+
+.clock-widget {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    align-self: center;
+}
+
+.widget-calendar {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: center;
+    width: 280px;
+    flex-shrink: 0;
+    margin-left: 0;
+    cursor: default;
+    padding: 20px;
+    gap: 12px;
+}
+
+.unified-search-widget {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+    align-self: center;
+    max-width: 1000px;
+    width: 100%;
+}
+
+.widget-weather {
+    grid-column: 1;
+    grid-row: 3;
+    width: clamp(260px, 30%, 380px);
+    flex-shrink: 0;
+    cursor: default;
+    gap: 4px;
+    align-items: center;
+    text-align: center;
+    padding: 24px 20px;
+}
+
+.widget-news {
+    grid-column: 2;
+    grid-row: 3;
+    flex: 1;
+    min-width: 0;
+    cursor: default;
+    gap: 0;
+    padding: 20px 24px;
+    overflow-y: scroll;
+}
+
+/* ============================================
+   Clock Widget
+   ============================================ */
+.clock-widget {
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #fff;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    line-height: 1;
+    padding: 4px 0;
+    user-select: none;
+}
+
+.clock-ampm {
+    margin-left: 0.4em;
+}
+
+.clock-digit {
+    display: inline-block;
+    animation: clockFlip 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.clock-digit.static {
+    animation: none;
+}
+
+.clock-digit:nth-child(3) {
+    opacity: 0.4;
+}
+
+.clock-digit:nth-child(6) {
+    opacity: 0.4;
+}
+
+@keyframes clockFlip {
+    0% {
+        transform: translateY(10px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ============================================
+   Calendar Widget
+   ============================================ */
+.widget-calendar {
+    width: 280px;
+    flex-shrink: 0;
+    margin-left: auto;
+    cursor: default;
+    padding: 20px;
+    gap: 12px;
+}
+
+.widget-calendar:hover {
+    transform: none;
+    box-shadow: 0 8px 32px var(--card-shadow);
+    border-color: var(--card-border);
+}
+
+.calendar-month {
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-color);
+    letter-spacing: 0.5px;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    text-align: center;
+}
+
+.calendar-day-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-color);
+    opacity: 0.5;
+    padding: 4px 0;
+}
+
+.calendar-day {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-color);
+    padding: 4px 0;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    transition: background 0.2s ease;
+}
+
+.calendar-day.other-month {
+    opacity: 0.25;
+}
+
+.calendar-day.today {
+    background: var(--accent-primary);
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ============================================
+   Weather Widget
+   ============================================ */
+.widget-weather {
+    cursor: default;
+    gap: 4px;
+    align-items: center;
+    text-align: center;
+    padding: 24px 20px;
+}
+
+.widget-weather:hover {
+    transform: none;
+    box-shadow: 0 8px 32px var(--card-shadow);
+    border-color: var(--card-border);
+}
+
+.weather-icon {
+    font-size: 40px;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.weather-temp {
+    font-size: 32px;
+    font-weight: 200;
+    color: var(--text-color);
+    line-height: 1.1;
+}
+
+.weather-condition {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-color);
+    opacity: 0.85;
+}
+
+.weather-feels {
+    font-size: 13px;
+    color: var(--text-color);
+    opacity: 0.6;
+    margin-top: 2px;
+}
+
+.weather-divider {
+    width: 40px;
+    height: 1px;
+    background: var(--text-color);
+    opacity: 0.15;
+    margin: 8px auto;
+}
+
+.weather-hilo {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-color);
+    opacity: 0.75;
+}
+
+.weather-city {
+    font-size: 12px;
+    color: var(--text-color);
+    opacity: 0.5;
+    margin-top: 4px;
+}
+
+.weather-extras {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text-color);
+    opacity: 0.6;
+    margin-top: 4px;
+}
+
+.weather-extras span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Weather Skeleton */
+.weather-skeleton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+}
+
+.weather-skeleton-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.weather-skeleton-line {
+    width: 120px;
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.weather-skeleton-line.short {
+    width: 80px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ============================================
+   News Widget
+   ============================================ */
+.widget-news {
+    cursor: default;
+    gap: 0;
+    padding: 20px 24px;
+    overflow-y: scroll;
+}
+
+.widget-news::-webkit-scrollbar {
+    width: 5px;
+}
+
+.widget-news::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px 0;
+}
+
+.widget-news::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+}
+
+.widget-news::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.widget-news:hover {
+    transform: none;
+    box-shadow: 0 8px 32px var(--card-shadow);
+    border-color: var(--card-border);
+}
+
+.widget-news-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.widget-news-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+    letter-spacing: 0.3px;
+}
+
+.widget-news-divider {
+    height: 1px;
+    background: var(--text-color);
+    opacity: 0.1;
+    margin: 8px 0;
+}
+
+.widget-news-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.widget-news-item {
+    padding: 4px 0;
+    color: var(--text-color);
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+
+.widget-news-item:last-child {
+    border-bottom: none;
+}
+
+.news-item-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.news-title-text {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    cursor: pointer;
+    padding: 4px 0;
+    transition: opacity 0.15s ease;
+}
+
+.news-title-text:hover {
+    opacity: 0.7;
+}
+
+.news-toggle {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--accent-primary);
+    cursor: pointer;
+    padding: 4px;
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+}
+
+.news-toggle:hover {
+    opacity: 1;
+}
+
+.news-toggle.open {
+    transform: rotate(90deg);
+}
+
+.news-read-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--text-color);
+    opacity: 0.4;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    font-size: 12px;
+}
+
+.news-read-btn:hover {
+    opacity: 1;
+    background: rgba(0,0,0,0.06);
+}
+
+.news-description {
+    font-size: 13px;
+    color: var(--text-color);
+    opacity: 0.65;
+    padding: 2px 0 6px 14px;
+    line-height: 1.4;
+    display: none;
+}
+
+.news-description.open {
+    display: block;
+}
+
+.news-bullet {
+    font-size: 8px;
+    color: var(--accent-primary);
+    flex-shrink: 0;
+    line-height: 1.6;
+}
+
+.news-text {
+    font-size: 14px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
+.widget-news-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+    padding-top: 4px;
+    font-size: 11px;
+    color: var(--text-color);
+    opacity: 0.4;
+    letter-spacing: 0.5px;
+}
+
+/* News Skeleton */
+.news-loading {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+}
+
+.news-skeleton {
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.news-empty {
+    font-size: 14px;
+    color: var(--text-color);
+    opacity: 0.5;
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* ============================================
+   Settings — Widgets Toggle Grid
+   ============================================ */
+.widgets-settings-group {
+    border-top: 1px solid rgba(0,0,0,0.08);
+    padding-top: 20px;
+    margin-top: 4px;
+}
+
+.widgets-settings-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 12px;
+    letter-spacing: 0.3px;
+}
+
+.widgets-settings-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+}
+
+.widget-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-color);
+    user-select: none;
+}
+
+.widget-toggle-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+}

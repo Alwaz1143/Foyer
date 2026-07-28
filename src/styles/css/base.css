@@ -2,6 +2,10 @@
    Base Body and Container Styles
    ============================================ */
 
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 /* Fix for mobile viewport height */
 html {
     /* height: -webkit-fill-available; */
