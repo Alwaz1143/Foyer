@@ -787,25 +787,35 @@ export default function HomePage() {
             <div className="form-group widgets-settings-group">
               <label className="widgets-settings-label">Widgets</label>
               <div className="widgets-settings-grid">
-                <label className="widget-toggle-label">
+                <label className="toggle-switch">
+                  <i className="fa-regular fa-clock"></i>
+                  <span className="toggle-label-text">Clock</span>
                   <input type="checkbox" id="widgetToggleClock" defaultChecked={widgetSettings.clock} />
-                  <span>Clock</span>
+                  <span className="toggle-slider"></span>
                 </label>
-                <label className="widget-toggle-label">
+                <label className="toggle-switch">
+                  <i className="fa-regular fa-calendar"></i>
+                  <span className="toggle-label-text">Calendar</span>
                   <input type="checkbox" id="widgetToggleCalendar" defaultChecked={widgetSettings.calendar} />
-                  <span>Calendar</span>
+                  <span className="toggle-slider"></span>
                 </label>
-                <label className="widget-toggle-label">
+                <label className="toggle-switch">
+                  <i className="fa-solid fa-cloud-sun"></i>
+                  <span className="toggle-label-text">Weather</span>
                   <input type="checkbox" id="widgetToggleWeather" defaultChecked={widgetSettings.weather} />
-                  <span>Weather</span>
+                  <span className="toggle-slider"></span>
                 </label>
-                <label className="widget-toggle-label">
+                <label className="toggle-switch">
+                  <i className="fa-regular fa-newspaper"></i>
+                  <span className="toggle-label-text">News</span>
                   <input type="checkbox" id="widgetToggleNews" defaultChecked={widgetSettings.news} />
-                  <span>News</span>
+                  <span className="toggle-slider"></span>
                 </label>
-                <label className="widget-toggle-label">
+                <label className="toggle-switch">
+                  <i className="fa-solid fa-magnifying-glass"></i>
+                  <span className="toggle-label-text">Search Bar</span>
                   <input type="checkbox" id="widgetToggleSearch" defaultChecked={widgetSettings.search} />
-                  <span>Search Bar</span>
+                  <span className="toggle-slider"></span>
                 </label>
               </div>
             </div>
