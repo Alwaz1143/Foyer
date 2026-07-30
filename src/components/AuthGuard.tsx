@@ -6,12 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db, auth } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 
-// Expose auth + db for legacy-style access from vanilla-JS parts
-if (typeof window !== "undefined") {
-  (window as any).auth = auth;
-  (window as any).db = db;
-}
-
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();

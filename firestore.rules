@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isFieldType(field, type) {
+      return field is type;
+    }
+
+    function isValidSettings(settings) {
+      return settings is map
+        && settings.keys().hasAll([
+          'wallpaperEnabled', 'selectedSearchEngine',
+          'lastWallpaperKeyword', 'customWallpaperKeywords',
+          'googleAiMode', 'widgets', 'weatherLocation'
+        ]);
+    }
+
+    // ── User document: users/{uid} ────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data is map;
+      // Deny delete (account removal should happen via Firebase Console)
+      allow delete: if false;
+
+      // ── Categories subcollection ────────────────────────────────────
+      match /categories/{categoryId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.name is string
+          && request.resource.data.name != ''
+          && request.resource.data.icon is string
+          && request.resource.data.orderIndex is number;
+        allow delete: if isOwner(userId);
+
+        // ── Websites subcollection ────────────────────────────────────
+        match /websites/{websiteId} {
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId)
+            && request.resource.data.name is string
+            && request.resource.data.name != ''
+            && request.resource.data.url is string
+            && request.resource.data.url != ''
+            && request.resource.data.domain is string
+            && request.resource.data.customIcon is string
+            && request.resource.data.orderIndex is number;
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      // ── Pending Bookmarks subcollection ─────────────────────────────
+      match /pendingBookmarks/{bookmarkId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.title is string
+          && request.resource.data.url is string
+          && request.resource.data.url != ''
+          && request.resource.data.normalizedUrl is string
+          && request.resource.data.confidence in ['high', 'medium', 'low', 'none']
+          && request.resource.data.status == 'pending'
+          && request.resource.data.source in ['extension', 'import']
+          && request.resource.data.timestamp is number;
+        allow update: if isOwner(userId)
+          && request.resource.data.status in ['confirmed', 'skipped'];
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

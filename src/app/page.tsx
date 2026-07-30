@@ -9,7 +9,8 @@ import { useUnsplash } from "@/hooks/useUnsplash";
 import { useSearch } from "@/hooks/useSearch";
 import { useCategories } from "@/contexts/CategoriesContext";
 import { classifySite } from "@/lib/classifySite";
-import { getRootDomain } from "@/lib/utils";
+import { getRootDomain, escapeHtml } from "@/lib/utils";
+import { normalizeUrl } from "@/lib/normalizeUrl";
 import { parseBookmarkHtml } from "@/lib/bookmarkParser";
 import type { ParsedBookmark } from "@/lib/types";
 import { UNSPLASH_CONFIG } from "@/lib/constants";
@@ -17,6 +18,7 @@ import { showToast } from "@/lib/toast";
 import { foyerKey } from "@/lib/storage";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { usePendingBookmarks, addPendingBookmark } from "@/hooks/usePendingBookmarks";
 import ShortcutGrid from "@/components/ShortcutGrid";
 import ClockWidget from "@/components/ClockWidget";
 import CalendarWidget from "@/components/CalendarWidget";
@@ -40,6 +42,7 @@ export default function HomePage() {
   useSearch();
   const { settings: widgetSettings, setSetting } = useWidgetSettings();
   const { categories, addSite, editSite, moveSite, addCategory, editCategory, deleteCategory, replaceAll, importBookmarks } = useCategories();
+  const { pendingCount, pendingBookmarks, confirmOne, skipOne, confirmAll, skipAll } = usePendingBookmarks();
 
   // User menu + basic click handlers
   useEffect(() => {
@@ -389,6 +392,7 @@ export default function HomePage() {
 
     const resetModal = () => {
       (window as any).__uncategorizedBookmarks = undefined;
+      (window as any).__importOverrides = undefined;
       setShowUncategorizedActions(false);
       document.getElementById("importStepUpload")!.style.display = "";
       document.getElementById("importStepPreview")!.style.display = "none";
@@ -444,13 +448,34 @@ export default function HomePage() {
           const badge = result.confidence === "high" ? "🟢 High" :
             result.confidence === "medium" ? "🟡 Medium" :
             result.confidence === "low" ? "🟠 Low" : "⚪ None";
-          const catName = result.suggestedCategoryName || "Uncategorized";
+          const categoryOptions = categories.map((c: any) =>
+            `<option value="${c.id}" ${c.id === result.categoryId ? 'selected' : ''}>${c.icon || ''} ${escapeHtml(c.name)}</option>`
+          ).join('');
           return `<tr>
-            <td class="import-title">${b.title}</td>
-            <td class="import-category">${catName}</td>
+            <td class="import-title">${escapeHtml(b.title)}</td>
+            <td class="import-folder">${b.folder ? escapeHtml(b.folder) : '—'}</td>
+            <td class="import-category">
+              <select data-url="${normalizeUrl(b.url)}" class="import-category-select">
+                <option value="" ${!result.categoryId ? 'selected' : ''}>— Uncategorized —</option>
+                ${categoryOptions}
+              </select>
+            </td>
             <td class="import-confidence"><span class="confidence-badge confidence-${result.confidence}">${badge}</span></td>
           </tr>`;
         }).join("");
+
+        // Wire up change listeners for category overrides
+        const overrides: Record<string, string> = {};
+        (window as any).__importOverrides = overrides;
+        tbody.querySelectorAll(".import-category-select").forEach((sel) => {
+          sel.addEventListener("change", (e) => {
+            const select = e.currentTarget as HTMLSelectElement;
+            const url = select.dataset.url!;
+            const val = select.value;
+            if (val) overrides[url] = val;
+            else delete overrides[url];
+          });
+        });
 
         document.getElementById("importSummary")!.textContent =
           `Found ${parsedBookmarks.length} bookmarks${skipExisting ? `. ${filtered.length} new after removing existing.` : "."}`;
@@ -465,6 +490,7 @@ export default function HomePage() {
 
     const handleConfirm = () => {
       const autoCreate = (document.getElementById("importAutoCreate") as HTMLInputElement)?.checked ?? false;
+      const highConfidenceOnly = (document.getElementById("importHighConfidence") as HTMLInputElement)?.checked ?? true;
       const categories = (window as any).__categories || [];
       const skipExisting = (document.getElementById("importSkipExisting") as HTMLInputElement)?.checked ?? true;
 
@@ -479,7 +505,23 @@ export default function HomePage() {
         toImport = parsedBookmarks.filter((b) => !existingUrls.has(b.url.trim().toLowerCase()));
       }
 
-      const result = importBookmarks(toImport, { autoCreateCategories: autoCreate });
+      const overrides = (window as any).__importOverrides || {};
+      const result = importBookmarks(toImport, { autoCreateCategories: autoCreate, categoryOverrides: overrides, autoImportHighConfidence: highConfidenceOnly });
+
+      // Write pending items to Firestore for later review
+      if (highConfidenceOnly && result.pending.length > 0 && uidRef.current) {
+        for (const item of result.pending) {
+          addPendingBookmark(
+            uidRef.current,
+            item.bookmark.title,
+            item.bookmark.url,
+            item.classification,
+            "import",
+            item.bookmark.folder,
+            item.bookmark.icon,
+          ).catch(() => {});
+        }
+      }
 
       document.getElementById("importStepPreview")!.style.display = "none";
       document.getElementById("importStepDone")!.style.display = "";
@@ -490,6 +532,9 @@ export default function HomePage() {
       let summary = `✅ Added <strong>${result.added}</strong> bookmarks`;
       if (result.skipped > 0) summary += `, skipped <strong>${result.skipped}</strong> duplicates`;
       if (result.createdCategories.length > 0) summary += `<br>📁 Created sections: <strong>${result.createdCategories.join(", ")}</strong>`;
+      if (highConfidenceOnly && result.pending.length > 0) {
+        summary += `<br>📋 <strong>${result.pending.length}</strong> bookmark${result.pending.length > 1 ? 's' : ''} saved for review — check the <i class="fas fa-bell"></i> badge on your avatar`;
+      }
       if (result.uncategorized.length > 0 && !autoCreate) {
         summary += `<br>⚠️ <strong>${result.uncategorized.length}</strong> bookmarks could not be categorized`;
         (window as any).__uncategorizedBookmarks = result.uncategorized;
@@ -667,6 +712,15 @@ export default function HomePage() {
           <img id="userAvatarImg" alt="" className="avatar-photo" style={{ display: "none" }} />
           <span id="userAvatarInitials" className="avatar-initials"></span>
         </button>
+        {pendingCount > 0 && (
+          <div className="pending-badge" id="pendingBadge" title={`${pendingCount} app${pendingCount > 1 ? 's' : ''} need review`}
+            onClick={() => {
+              const m = document.getElementById("reviewPendingModal");
+              if (m) m.style.display = "flex";
+            }}>
+            {pendingCount > 9 ? '9+' : pendingCount}
+          </div>
+        )}
         <div className="user-menu" id="userMenu">
           <div className="user-menu-info">
             <div className="user-menu-name" id="userMenuName"></div>
@@ -896,14 +950,19 @@ export default function HomePage() {
                 <input type="checkbox" id="importAutoCreate" style={{ width: 18, height: 18 }} />
                 <label htmlFor="importAutoCreate" style={{ margin: 0 }}>Create new sections for unmatched domains</label>
               </div>
+              <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input type="checkbox" id="importHighConfidence" defaultChecked style={{ width: 18, height: 18 }} />
+                <label htmlFor="importHighConfidence" style={{ margin: 0 }}>Only auto-import high-confidence matches (rest saved for review)</label>
+              </div>
             </div>
             <div id="importStepPreview" style={{ display: "none" }}>
               <p id="importSummary" style={{ marginBottom: 12, color: "var(--text-color)", fontWeight: 500 }}></p>
-              <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--input-border)", borderRadius: 12, marginBottom: 12 }}>
+              <div className="import-table-wrapper" style={{ maxHeight: 420, overflowY: "auto", border: "1px solid var(--input-border)", borderRadius: 12, marginBottom: 12 }}>
                 <table className="import-table" id="importPreviewTable">
                   <thead>
                     <tr>
                       <th>Title</th>
+                      <th>Folder</th>
                       <th>Category</th>
                       <th>Confidence</th>
                     </tr>
@@ -967,6 +1026,92 @@ export default function HomePage() {
               <i className="fas fa-upload" style={{ marginRight: 6 }}></i>Import Now
             </button>
           </div>
+        </div>
+      </div>
+
+      <div id="reviewPendingModal" className="modal">
+        <div className="modal-content" style={{ maxWidth: 700 }}>
+          <div className="modal-header">
+            <h2><i className="fas fa-clipboard-list" style={{ marginRight: 10 }}></i>Review Uncategorized Apps</h2>
+            <button className="close-btn" id="closeReviewPendingBtn" aria-label="Close review" onClick={() => closeModal("reviewPendingModal")}>&times;</button>
+          </div>
+          <div className="modal-form">
+            {pendingBookmarks.length === 0 ? (
+              <p style={{ color: "var(--text-secondary)", textAlign: "center", padding: "40px 0" }}>
+                <i className="fas fa-check-circle" style={{ fontSize: 48, display: "block", marginBottom: 16, color: "#1db954" }}></i>
+                No uncategorized apps pending review.
+              </p>
+            ) : (
+              <>
+                <p style={{ color: "var(--text-color)", marginBottom: 12 }}>
+                  {pendingBookmarks.length} app{pendingBookmarks.length > 1 ? 's' : ''} could not be automatically categorized. Assign them to a section or skip them.
+                </p>
+                <div className="import-table-wrapper" style={{ maxHeight: 400, overflowY: "auto", border: "1px solid var(--input-border)", borderRadius: 12, marginBottom: 12 }}>
+                  <table className="import-table">
+                    <thead>
+                      <tr>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Confidence</th>
+                        <th style={{ width: 140, textAlign: "center" }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingBookmarks.map((p) => {
+                        const badgeText = p.confidence === "high" ? "🟢 High" :
+                          p.confidence === "medium" ? "🟡 Medium" :
+                          p.confidence === "low" ? "🟠 Low" : "⚪ None";
+                        return (
+                          <tr key={p.id}>
+                            <td className="import-title" title={p.url}>{escapeHtml(p.title)}</td>
+                            <td>
+                              <select className="import-category-select" data-pending-id={p.id}>
+                                <option value="">— Uncategorized —</option>
+                                {categories.map((c) => (
+                                  <option key={c.id} value={c.id}>{c.icon} {escapeHtml(c.name)}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td><span className={`confidence-badge confidence-${p.confidence}`}>{badgeText}</span></td>
+                            <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                              <button className="btn-primary-sm" style={{ marginRight: 6, padding: "4px 12px", fontSize: 13, borderRadius: 8 }}
+                                onClick={async () => {
+                                  const sel = document.querySelector(`select[data-pending-id="${p.id}"]`) as HTMLSelectElement;
+                                  const catId = sel?.value;
+                                  if (!catId) { showToast("Select a category first.", "error"); return; }
+                                  await confirmOne(p.id, catId);
+                                  showToast(`Added ${p.title} to section.`);
+                                }}>Add</button>
+                              <button className="btn-secondary-sm" style={{ padding: "4px 12px", fontSize: 13, borderRadius: 8 }}
+                                onClick={async () => {
+                                  await skipOne(p.id);
+                                  showToast("Skipped.");
+                                }}>Skip</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+          {pendingBookmarks.length > 0 && (
+            <div className="modal-actions" style={{ padding: "0 28px 24px" }}>
+              <button type="button" className="btn-secondary" onClick={async () => { await skipAll(); showToast("All skipped."); }}><i className="fas fa-times" style={{ marginRight: 6 }}></i>Skip All</button>
+              <button type="button" className="btn-primary" onClick={async () => {
+                for (const p of pendingBookmarks) {
+                  const sel = document.querySelector(`select[data-pending-id="${p.id}"]`) as HTMLSelectElement;
+                  const catId = sel?.value;
+                  if (catId) {
+                    await confirmOne(p.id, catId);
+                  }
+                }
+                showToast("Confirmed all with selected categories.");
+              }}><i className="fas fa-check" style={{ marginRight: 6 }}></i>Confirm All</button>
+            </div>
+          )}
         </div>
       </div>
 

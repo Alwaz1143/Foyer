@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+
 import { foyerKey } from "@/lib/storage";
 import { showToast } from "@/lib/toast";
 
@@ -42,26 +41,7 @@ export function useUnsplash() {
     } catch { /* ignore */ }
   }, [user]); // re-run on every user change
 
-  // Load Unsplash state from Firestore
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      try {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists() && snap.data().unsplash?.accessToken) {
-          const data = snap.data().unsplash;
-          setAccessToken(data.accessToken);
-          setCollectionId(data.foyerCollectionId || null);
-          setUsername(data.username || null);
-          setConnected(true);
-          localStorage.setItem(foyerKey("unsplash_connection", user.uid), JSON.stringify(data));
-        }
-      } catch (e) {
-        console.warn("Could not load Unsplash state:", e);
-      }
-    };
-    load();
-  }, [user]);
+
 
   /**
    * Recomputes and applies the heart button color based on:
@@ -143,7 +123,15 @@ export function useUnsplash() {
         cid = col.id;
         setCollectionId(cid);
         if (user) {
-          await setDoc(doc(db, "users", user.uid), { unsplash: { foyerCollectionId: cid } }, { merge: true });
+          const key = foyerKey("unsplash_connection", user.uid);
+          const stored = localStorage.getItem(key);
+          if (stored) {
+            try {
+              const data = JSON.parse(stored);
+              data.foyerCollectionId = cid;
+              localStorage.setItem(key, JSON.stringify(data));
+            } catch { /* ignore */ }
+          }
         }
       }
 

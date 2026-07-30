@@ -220,7 +220,20 @@ export default function ShortcutGrid() {
     );
   }
 
-  if (categories.length === 0) return null;
+  if (categories.length === 0) {
+    return (
+      <section className="shortcuts-grid shortcuts-grid--empty">
+        <div className="empty-state">
+          <span className="empty-state-icon">📚</span>
+          <h2 className="empty-state-title">Welcome to Foyer!</h2>
+          <p className="empty-state-desc">
+            Add your first section to get started. Click the <strong>+ Add Section</strong> button above
+            or import bookmarks from your browser.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="shortcuts-grid" id="shortcutsGrid" ref={gridRef}>

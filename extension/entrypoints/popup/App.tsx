@@ -1,17 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { signInWithEmail, signUp } from "../../lib/auth";
 import type { ClassificationResult } from "../../shared/classifySite";
+import type { PendingBookmark } from "../../shared/types";
 import "./styles.css";
 
 type PageState = "loading" | "signin" | "ready" | "pending" | "confirming" | "adding" | "added" | "error" | "syncing" | "synced";
-
-interface PendingBookmark {
-  title: string;
-  url: string;
-  folderHint?: string;
-  classification: ClassificationResult;
-  timestamp: number;
-}
 
 const CONFIDENCE_LABELS: Record<string, string> = {
   high: "High",
@@ -58,8 +51,8 @@ export default function App() {
           setPendingBookmarks(pendingRes.pendingBookmarks);
           setPendingIndex(0);
           const first = pendingRes.pendingBookmarks[0];
-          setSelectedCategoryId(first.classification?.suggestedCategoryName
-            ? findCategoryIdByName(catRes.categories, first.classification.suggestedCategoryName)
+          setSelectedCategoryId(first.suggestedCategoryName
+            ? findCategoryIdByName(catRes.categories, first.suggestedCategoryName)
             : "");
           setState("pending");
         } else {
@@ -173,10 +166,10 @@ export default function App() {
 
     const res = await chrome.runtime.sendMessage({
       type: "CONFIRM_BOOKMARK",
-      index: pendingIndex,
+      pendingId: item.id,
       title: item.title,
       url: item.url,
-      folderHint: item.folderHint,
+      folderHint: item.folder,
       categoryId: selectedCategoryId || undefined,
     });
 
@@ -199,7 +192,7 @@ export default function App() {
     setConfirmLoading(true);
     await chrome.runtime.sendMessage({
       type: "SKIP_PENDING_BOOKMARK",
-      index: pendingIndex,
+      pendingId: item.id,
     });
     setConfirmLoading(false);
     setMessage("Skipped");
@@ -220,8 +213,13 @@ export default function App() {
   };
 
   async function advanceToNext() {
-    const refresh = await chrome.runtime.sendMessage({ type: "GET_PENDING_BOOKMARKS" });
+    const [refresh, catRes] = await Promise.all([
+      chrome.runtime.sendMessage({ type: "GET_PENDING_BOOKMARKS" }),
+      chrome.runtime.sendMessage({ type: "GET_CATEGORIES" }),
+    ]);
     const updated: PendingBookmark[] = refresh.pendingBookmarks || [];
+    const freshCats = catRes.categories ? catRes.categories.map((c: any) => ({ id: c.id, name: c.name })) : categories;
+    setCategories(freshCats);
     if (updated.length === 0) {
       setPendingBookmarks([]);
       setState("ready");
@@ -235,8 +233,8 @@ export default function App() {
       setPendingBookmarks(updated);
       setPendingIndex(nextIdx);
       setSelectedCategoryId(
-        updated[nextIdx]?.classification?.suggestedCategoryName
-          ? findCategoryIdByName(categories, updated[nextIdx].classification.suggestedCategoryName)
+        updated[nextIdx]?.suggestedCategoryName
+          ? findCategoryIdByName(freshCats, updated[nextIdx].suggestedCategoryName)
           : ""
       );
       setState("pending");
@@ -318,9 +316,8 @@ export default function App() {
     const pendingItem = pendingBookmarks[pendingIndex];
     const total = pendingBookmarks.length;
     const current = pendingIndex + 1;
-    const cls = pendingItem?.classification;
 
-    const canProceed = !!selectedCategoryId || !!cls?.categoryId;
+    const canProceed = !!selectedCategoryId;
 
     return (
       <div className="popup-container">
@@ -340,17 +337,17 @@ export default function App() {
           </div>
         )}
 
-        {cls && cls.confidence !== "none" && (
-          <div className="confidence-badge" style={{ borderLeftColor: getConfidenceColor(cls.confidence) }}>
-            <span className="confidence-dot" style={{ background: getConfidenceColor(cls.confidence) }}></span>
-            Detected: <strong>{cls.suggestedCategoryName || "Uncategorized"}</strong>
-            <span className="confidence-label" style={{ color: getConfidenceColor(cls.confidence) }}>
-              ({getConfidenceLabel(cls.confidence)})
+        {pendingItem && pendingItem.confidence !== "none" && (
+          <div className="confidence-badge" style={{ borderLeftColor: getConfidenceColor(pendingItem.confidence) }}>
+            <span className="confidence-dot" style={{ background: getConfidenceColor(pendingItem.confidence) }}></span>
+            Detected: <strong>{pendingItem.suggestedCategoryName || "Uncategorized"}</strong>
+            <span className="confidence-label" style={{ color: getConfidenceColor(pendingItem.confidence) }}>
+              ({getConfidenceLabel(pendingItem.confidence)})
             </span>
           </div>
         )}
 
-        {cls && cls.confidence === "none" && (
+        {pendingItem && pendingItem.confidence === "none" && (
           <div className="confidence-badge" style={{ borderLeftColor: "#888" }}>
             <span className="confidence-dot" style={{ background: "#888" }}></span>
             Could not auto-detect category
@@ -365,7 +362,7 @@ export default function App() {
             onChange={(e) => setSelectedCategoryId(e.target.value)}
             disabled={confirmLoading}
           >
-            <option value="">{cls?.categoryId ? "Use detected category" : "Select a category..."}</option>
+            <option value="">{pendingItem?.suggestedCategoryName ? "Use detected category" : "Select a category..."}</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
@@ -390,7 +387,7 @@ export default function App() {
             ) : (
               <><i className="fas fa-check"></i> Add to {selectedCategoryId
                 ? categories.find(c => c.id === selectedCategoryId)?.name || "Foyer"
-                : cls?.suggestedCategoryName || "Foyer"}</>
+                : pendingItem?.suggestedCategoryName || "Foyer"}</>
             )}
           </button>
         </div>

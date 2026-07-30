@@ -62,3 +62,17 @@ export interface CachedWallpaper extends UnsplashPhoto {
   previewUrl: string;
   highResUrl: string;
 }
+
+export interface PendingBookmark {
+  id: string;
+  title: string;
+  url: string;
+  normalizedUrl: string;
+  folder?: string;
+  suggestedCategoryName?: string;
+  confidence: "high" | "medium" | "low" | "none";
+  matchedBy: "domain" | "folder" | "keyword" | "none";
+  source: "extension" | "import";
+  timestamp: number;
+  status: "pending" | "confirmed" | "skipped";
+}

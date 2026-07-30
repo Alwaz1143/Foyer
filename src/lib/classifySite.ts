@@ -47,9 +47,35 @@ export function classifySite(
 
   if (!url && !name) return none;
 
-  // Step 1: Domain map lookup
-  const domain = getRootDomain(url);
-  const candidates = domain ? domainCategoryMap[domain] : undefined;
+  // Step 1: Browser folder hint — user's own organization takes priority
+  if (folderHint) {
+    const match = matchCategoryByName(folderHint, existingCategories);
+    if (match) {
+      return {
+        categoryId: match.id,
+        suggestedCategoryName: folderHint,
+        confidence: "high",
+        matchedBy: "folder",
+      };
+    }
+    // Folder hint provided but no matching category → suggest it for auto-create
+    return {
+      categoryId: null,
+      suggestedCategoryName: folderHint,
+      confidence: "medium",
+      matchedBy: "folder",
+    };
+  }
+
+  // Step 2: Domain map lookup — check full hostname first (catches subdomain entries
+  // like "mail.google.com"), then fall back to the root domain.
+  let hostname = "";
+  try { hostname = new URL(url).hostname.toLowerCase(); } catch { /* invalid url */ }
+  let candidates = hostname ? domainCategoryMap[hostname] : undefined;
+  if (!candidates || candidates.length === 0) {
+    const domain = getRootDomain(url);
+    candidates = domain ? domainCategoryMap[domain] : undefined;
+  }
 
   if (candidates && candidates.length > 0) {
     for (const candidate of candidates) {
@@ -63,26 +89,12 @@ export function classifySite(
         };
       }
     }
-    // Domain is in map but no matching category exists
     return {
       categoryId: null,
       suggestedCategoryName: candidates[0] ?? null,
       confidence: "medium",
       matchedBy: "domain",
     };
-  }
-
-  // Step 2: Browser folder hint
-  if (folderHint) {
-    const match = matchCategoryByName(folderHint, existingCategories);
-    if (match) {
-      return {
-        categoryId: match.id,
-        suggestedCategoryName: folderHint,
-        confidence: "medium",
-        matchedBy: "folder",
-      };
-    }
   }
 
   // Step 3: Keyword fallback — tokenize site name, match against category names

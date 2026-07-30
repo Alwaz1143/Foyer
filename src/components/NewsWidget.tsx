@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useNews } from "@/hooks/useNews";
 
 export default function NewsWidget() {
-  const { items, loading } = useNews();
+  const { items, loading, error, retry } = useNews();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const toggle = (i: number) => {
@@ -27,6 +27,12 @@ export default function NewsWidget() {
           {Array.from({ length: 10 }, (_, i) => (
             <div key={i} className="news-skeleton" style={{ animationDelay: `${i * 0.1}s` }}></div>
           ))}
+        </div>
+      ) : error && items.length === 0 ? (
+        <div className="widget-error">
+          <span className="widget-error-icon">📰</span>
+          <span className="widget-error-msg">{error}</span>
+          <button className="btn-retry" onClick={retry}>Retry</button>
         </div>
       ) : items.length === 0 ? (
         <div className="news-empty">No headlines available</div>

@@ -44,12 +44,10 @@ export function getRootDomain(input: string): string {
 
 export function getCategoryDisplayName(category: Category): string {
   if (!category) return "";
-  let name = (category.name || "").trim();
+  const name = (category.name || "").trim();
   const icon = (category.icon || "").trim();
-  if (icon && name) {
-    const escapedIcon = icon.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    name = name.replace(new RegExp(escapedIcon, "g"), "").trim();
-    name = name.replace(/^[-\s]+|[-\s]+$/g, "").trim();
+  if (icon && name.startsWith(icon)) {
+    return name.slice(icon.length).trim();
   }
   return name || category.name || "";
 }

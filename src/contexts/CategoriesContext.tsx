@@ -11,6 +11,7 @@ import { foyerKey } from "@/lib/storage";
 import { classifySite } from "@/lib/classifySite";
 import { normalizeUrl } from "@/lib/normalizeUrl";
 import type { Category, Website, ParsedBookmark } from "@/lib/types";
+import type { ClassificationResult } from "@/lib/classifySite";
 
 interface CategoriesContextValue {
   categories: Category[];
@@ -26,8 +27,8 @@ interface CategoriesContextValue {
   replaceAll: (newCategories: Category[]) => void;
   importBookmarks: (
     bookmarks: ParsedBookmark[],
-    opts?: { autoCreateCategories?: boolean }
-  ) => { added: number; skipped: number; uncategorized: ParsedBookmark[]; createdCategories: string[] };
+    opts?: { autoCreateCategories?: boolean; categoryOverrides?: Record<string, string>; autoImportHighConfidence?: boolean }
+  ) => { added: number; skipped: number; uncategorized: ParsedBookmark[]; createdCategories: string[]; pending: { bookmark: ParsedBookmark; classification: ClassificationResult }[] };
 }
 
 const CategoriesContext = createContext<CategoriesContextValue | null>(null);
@@ -41,6 +42,8 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   const prevUidRef = useRef<string | null>(null);
   const uidRef = useRef<string | null>(null);
   uidRef.current = user?.uid || null;
+  const categoriesRef = useRef<Category[]>(categories);
+  categoriesRef.current = categories;
 
   // Unified loading effect — gated on auth resolution to avoid stale-key reads and double-renders.
   // Uses a `cancelled` flag so stale async Firestore responses can't race after user changes.
@@ -135,7 +138,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
           const deduped = loaded.map((cat) => {
             const seen = new Map<string, Website>();
             for (const site of cat.websites) {
-              const key = site.url.trim().toLowerCase();
+              const key = normalizeUrl(site.url);
               if (!seen.has(key)) {
                 seen.set(key, site);
               } else {
@@ -145,6 +148,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
             return { ...cat, websites: Array.from(seen.values()) };
           });
 
+          if (cancelled) return;
           setCategories(deduped);
           localStorage.setItem(catKey, JSON.stringify(deduped));
           initKnownIds(deduped);
@@ -207,89 +211,81 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   }, [user, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addSite = useCallback((name: string, url: string, categoryId: string, customIcon?: string) => {
-    setCategories((prev) => {
-      const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
-      const cat = next.find((c) => c.id === categoryId);
-      if (!cat) return prev;
-      const domain = getRootDomain(url);
-      cat.websites.push({ id: generateSiteId(), name, url, domain, customIcon: customIcon || "" });
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-      scheduleSync(next);
-      return next;
-    });
+    const prev = categoriesRef.current;
+    const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
+    const cat = next.find((c) => c.id === categoryId);
+    if (!cat) return;
+    const domain = getRootDomain(url);
+    cat.websites.push({ id: generateSiteId(), name, url, domain, customIcon: customIcon || "" });
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
   }, [scheduleSync]);
 
   const editSite = useCallback((catIndex: number, siteIndex: number, updates: Partial<Website>) => {
-    setCategories((prev) => {
-      const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
-      Object.assign(next[catIndex].websites[siteIndex], updates);
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-      scheduleSync(next);
-      return next;
-    });
+    const prev = categoriesRef.current;
+    const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
+    Object.assign(next[catIndex].websites[siteIndex], updates);
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
   }, [scheduleSync]);
 
   const deleteSite = useCallback((catIndex: number, siteIndex: number) => {
-    setCategories((prev) => {
-      const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
-      next[catIndex].websites.splice(siteIndex, 1);
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-      scheduleSync(next);
-      return next;
-    });
+    const prev = categoriesRef.current;
+    const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
+    next[catIndex].websites.splice(siteIndex, 1);
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
   }, [scheduleSync]);
 
   const moveSite = useCallback((fromCatIdx: number, fromSiteIdx: number, toCatIdx: number, toSiteIdx: number) => {
-    setCategories((prev) => {
-      const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
-      const [site] = next[fromCatIdx].websites.splice(fromSiteIdx, 1);
-      const adjustedIdx = fromCatIdx === toCatIdx && fromSiteIdx < toSiteIdx ? toSiteIdx - 1 : toSiteIdx;
-      next[toCatIdx].websites.splice(adjustedIdx, 0, site);
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-      scheduleSync(next);
-      return next;
-    });
+    const prev = categoriesRef.current;
+    const next = prev.map((c) => ({ ...c, websites: [...c.websites] }));
+    const [site] = next[fromCatIdx].websites.splice(fromSiteIdx, 1);
+    const adjustedIdx = fromCatIdx === toCatIdx && fromSiteIdx < toSiteIdx ? toSiteIdx - 1 : toSiteIdx;
+    next[toCatIdx].websites.splice(adjustedIdx, 0, site);
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
   }, [scheduleSync]);
 
   const addCategory = useCallback((name: string, icon: string) => {
-    setCategories((prev) => {
-      const existingIds = new Set(prev.map((c) => c.id));
-      const newCat: Category = { id: generateCategoryId(name, existingIds), name, icon: icon || name.charAt(0).toUpperCase() || "📁", websites: [] };
-      const next = [...prev, newCat];
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-      scheduleSync(next);
-      return next;
-    });
+    const prev = categoriesRef.current;
+    const existingIds = new Set(prev.map((c) => c.id));
+    const newCat: Category = { id: generateCategoryId(name, existingIds), name, icon: icon || "📁", websites: [] };
+    const next = [...prev, newCat];
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
   }, [scheduleSync]);
 
   const editCategory = useCallback((catIndex: number, name: string, icon: string) => {
-    setCategories((prev) => {
-      const next = [...prev];
-      next[catIndex] = { ...next[catIndex], name, icon };
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-      scheduleSync(next);
-      return next;
-    });
+    const prev = categoriesRef.current;
+    const next = [...prev];
+    next[catIndex] = { ...next[catIndex], name, icon };
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
   }, [scheduleSync]);
 
   const deleteCategory = useCallback((catIndex: number) => {
-    setCategories((prev) => {
-      const next = prev.filter((_, i) => i !== catIndex);
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-      scheduleSync(next);
-      return next;
-    });
+    const prev = categoriesRef.current;
+    const next = prev.filter((_, i) => i !== catIndex);
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
   }, [scheduleSync]);
 
   const reorderCategories = useCallback((fromIdx: number, toIdx: number) => {
-    setCategories((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
-      scheduleSync(next);
-      return next;
-    });
+    const prev = categoriesRef.current;
+    const next = [...prev];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setCategories(next);
+    localStorage.setItem(foyerKey("categories", uidRef.current), JSON.stringify(next));
+    scheduleSync(next);
   }, [scheduleSync]);
 
   const replaceAll = useCallback((newCats: Category[]) => {
@@ -300,15 +296,15 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
   const importBookmarks = useCallback((
     bookmarks: ParsedBookmark[],
-    opts?: { autoCreateCategories?: boolean }
-  ): { added: number; skipped: number; uncategorized: ParsedBookmark[]; createdCategories: string[] } => {
+    opts?: { autoCreateCategories?: boolean; categoryOverrides?: Record<string, string>; autoImportHighConfidence?: boolean }
+  ): { added: number; skipped: number; uncategorized: ParsedBookmark[]; createdCategories: string[]; pending: { bookmark: ParsedBookmark; classification: ClassificationResult }[] } => {
     const autoCreate = opts?.autoCreateCategories ?? false;
+    const overrides = opts?.categoryOverrides ?? {};
+    const highConfidenceOnly = opts?.autoImportHighConfidence ?? false;
 
-    // Capture the current categories synchronously to compute the result
-    let currentCats: Category[] = [];
-    setCategories((prev) => { currentCats = prev; return prev; });
+    const currentCats = categoriesRef.current;
 
-    const result = { added: 0, skipped: 0, uncategorized: [] as ParsedBookmark[], createdCategories: [] as string[] };
+    const result = { added: 0, skipped: 0, uncategorized: [] as ParsedBookmark[], createdCategories: [] as string[], pending: [] as { bookmark: ParsedBookmark; classification: ClassificationResult }[] };
     const next = currentCats.map((c) => ({ ...c, websites: [...c.websites] }));
     const existingUrls = new Set<string>();
     const existingIds = new Set(next.map((c) => c.id));
@@ -325,7 +321,32 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
         continue;
       }
 
+      // Check user override from preview dropdown
+      const overrideCategoryId = overrides[normalUrl];
+      if (overrideCategoryId) {
+        const cat = next.find((c) => c.id === overrideCategoryId);
+        if (cat) {
+          const domain = getRootDomain(bookmark.url);
+          cat.websites.push({
+            id: generateSiteId(),
+            name: bookmark.title,
+            url: bookmark.url,
+            domain,
+            customIcon: bookmark.icon || "",
+          });
+          existingUrls.add(normalUrl);
+          result.added++;
+          continue;
+        }
+      }
+
       const classification = classifySite(bookmark.title, bookmark.url, next, bookmark.folder);
+
+      // Staged import: only auto-import high-confidence matches
+      if (highConfidenceOnly && classification.confidence !== "high") {
+        result.pending.push({ bookmark, classification });
+        continue;
+      }
 
       let categoryId = classification.categoryId;
       if (!categoryId && autoCreate && classification.suggestedCategoryName) {
@@ -333,7 +354,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
         const newCategory: Category = {
           id: newId,
           name: classification.suggestedCategoryName,
-          icon: classification.suggestedCategoryName.charAt(0).toUpperCase() || "📁",
+          icon: "📁",
           websites: [],
         };
         next.push(newCategory);
@@ -363,17 +384,59 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // When autoCreate is ON, handle uncategorized bookmarks by grouping by root domain
+    // When autoCreate is ON, handle remaining uncategorized bookmarks
     if (autoCreate && result.uncategorized.length > 0) {
       const existingIds = new Set(next.map((c) => c.id));
-      const domainMap = new Map<string, ParsedBookmark[]>();
+      const stillUncategorized: ParsedBookmark[] = [];
+
+      // Pass 1: Group by browser folder name (catches any bookmarks with folders that
+      // weren't matched by classifySite's folder-first pipeline)
+      const folderMap = new Map<string, ParsedBookmark[]>();
       for (const b of result.uncategorized) {
+        const key = b.folder || "";
+        if (!folderMap.has(key)) folderMap.set(key, []);
+        folderMap.get(key)!.push(b);
+      }
+
+      // Create a category for each folder group with ≥2 bookmarks
+      for (const [folder, folderBookmarks] of folderMap) {
+        if (!folder) {
+          stillUncategorized.push(...folderBookmarks);
+          continue;
+        }
+        if (folderBookmarks.length >= 2) {
+          const sectionName = folder;
+          const newId = generateCategoryId(sectionName, existingIds);
+          existingIds.add(newId);
+          const section: Category = {
+            id: newId,
+            name: sectionName,
+            icon: "📁",
+            websites: folderBookmarks.map((b) => ({
+              id: generateSiteId(),
+              name: b.title,
+              url: b.url,
+              domain: getRootDomain(b.url),
+              customIcon: b.icon || "",
+            })),
+          };
+          next.push(section);
+          result.added += folderBookmarks.length;
+          result.createdCategories.push(sectionName);
+        } else {
+          stillUncategorized.push(...folderBookmarks);
+        }
+      }
+
+      // Pass 2: Group remaining folder-less bookmarks by root domain (≥3)
+      const domainMap = new Map<string, ParsedBookmark[]>();
+      for (const b of stillUncategorized) {
         const domain = getRootDomain(b.url);
         if (!domainMap.has(domain)) domainMap.set(domain, []);
         domainMap.get(domain)!.push(b);
       }
 
-      const stillUncategorized: ParsedBookmark[] = [];
+      const domainUncategorized: ParsedBookmark[] = [];
       for (const [domain, domainBookmarks] of domainMap) {
         if (domainBookmarks.length >= 3) {
           const sectionName = domain.charAt(0).toUpperCase() + domain.slice(1);
@@ -395,18 +458,19 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
           result.added += domainBookmarks.length;
           result.createdCategories.push(sectionName);
         } else {
-          stillUncategorized.push(...domainBookmarks);
+          domainUncategorized.push(...domainBookmarks);
         }
       }
 
-      if (stillUncategorized.length > 0) {
+      // Pass 3: Anything left goes into an "Uncategorized" section
+      if (domainUncategorized.length > 0) {
         const sectionName = "Uncategorized";
         const newId = generateCategoryId(sectionName, existingIds);
         const section: Category = {
           id: newId,
           name: sectionName,
           icon: "📂",
-          websites: stillUncategorized.map((b) => ({
+          websites: domainUncategorized.map((b) => ({
             id: generateSiteId(),
             name: b.title,
             url: b.url,
@@ -415,7 +479,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
           })),
         };
         next.push(section);
-        result.added += stillUncategorized.length;
+        result.added += domainUncategorized.length;
         result.createdCategories.push(sectionName);
       }
 

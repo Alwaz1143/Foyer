@@ -1,6 +1,6 @@
 import { defineBackground } from "wxt/sandbox";
 import { onUserChanged } from "../lib/auth";
-import { getCategories, addSiteToCategory } from "../lib/firestore";
+import { getCategories, addSiteToCategory, addPendingBookmark, getPendingBookmarks, removePendingBookmark, clearAllPending } from "../lib/firestore";
 import { classifySite } from "../shared/classifySite";
 import type { ClassificationResult } from "../shared/classifySite";
 import { normalizeUrl } from "../shared/normalizeUrl";
@@ -17,19 +17,31 @@ interface QueuedBookmark {
   folderHint?: string;
 }
 
-interface PendingBookmark {
-  title: string;
-  url: string;
-  folderHint?: string;
-  classification: ClassificationResult;
-  timestamp: number;
-}
-
 let currentUser: { uid: string } | null = null;
 let cachedCategories: Category[] = [];
 let syncInProgress = false;
 let mirrorDeletions = false;
-const bookmarkQueue: QueuedBookmark[] = [];
+let bookmarkQueue: QueuedBookmark[] = [];
+
+const QUEUE_STORAGE_KEY = "foyer_bookmark_queue";
+
+async function persistQueue() {
+  try {
+    await chrome.storage.local.set({ [QUEUE_STORAGE_KEY]: bookmarkQueue });
+  } catch { /* storage quota exceeded — best effort */ }
+}
+
+async function restoreQueue(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(QUEUE_STORAGE_KEY);
+    const restored = result[QUEUE_STORAGE_KEY];
+    if (Array.isArray(restored) && restored.length > 0) {
+      bookmarkQueue = restored;
+      // Fire queue after restoring if user is signed in
+      if (currentUser) await flushBookmarkQueue();
+    }
+  } catch { /* ignore read errors */ }
+}
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 
@@ -104,6 +116,7 @@ async function addBookmarkToFoyer(
 
 function queueBookmark(title: string, url: string, folderHint?: string) {
   bookmarkQueue.push({ title, url, folderHint });
+  persistQueue();
 }
 
 async function flushBookmarkQueue() {
@@ -115,10 +128,13 @@ async function flushBookmarkQueue() {
     const result = await addBookmarkToFoyer(item.title, item.url, item.folderHint);
     if (result.added) count++;
   }
+  await persistQueue();
   if (count > 0) {
     await updateBadge(count);
   }
 }
+
+// ── Badge ────────────────────────────────────────────────────────────────────
 
 async function updateBadge(count: number) {
   const prev = await chrome.action.getBadgeText({});
@@ -127,54 +143,26 @@ async function updateBadge(count: number) {
   await chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
 }
 
-// ── Pending bookmark storage ────────────────────────────────────────────────
-
-let pendingCache: PendingBookmark[] | null = null;
-
-async function getPendingList(): Promise<PendingBookmark[]> {
-  if (pendingCache === null) {
-    const result = await chrome.storage.local.get("pendingBookmarks");
-    pendingCache = result.pendingBookmarks || [];
-  }
-  return pendingCache;
-}
-
-async function flushPendingCache(): Promise<void> {
-  if (pendingCache !== null) {
-    if (pendingCache.length > 0) {
-      await chrome.storage.local.set({ pendingBookmarks: pendingCache });
-    } else {
-      await chrome.storage.local.remove("pendingBookmarks");
-    }
-  }
-}
-
-async function storePendingBookmark(pending: PendingBookmark): Promise<void> {
-  const list = await getPendingList();
-  list.push(pending);
-  await flushPendingCache();
-  await chrome.action.setBadgeText({ text: "!" });
-  await chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
-  await chrome.action.setTitle({
-    title: `${list.length} bookmark${list.length > 1 ? "s" : ""} awaiting confirmation`,
-  });
-}
-
-async function clearPendingBookmark(index: number): Promise<void> {
-  const list = await getPendingList();
-  if (index < 0 || index >= list.length) return;
-  list.splice(index, 1);
-  if (list.length > 0) {
-    await flushPendingCache();
-    await chrome.action.setBadgeText({ text: "!" });
-    await chrome.action.setTitle({
-      title: `${list.length} bookmark${list.length > 1 ? "s" : ""} awaiting confirmation`,
-    });
-  } else {
-    pendingCache = [];
-    await chrome.storage.local.remove("pendingBookmarks");
+async function setBadgeToPendingCount() {
+  if (!currentUser) {
     await chrome.action.setBadgeText({ text: "" });
     await chrome.action.setTitle({ title: "Foyer" });
+    return;
+  }
+  try {
+    const pending = await getPendingBookmarks(currentUser.uid);
+    if (pending.length > 0) {
+      await chrome.action.setBadgeText({ text: pending.length.toString() });
+      await chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
+      await chrome.action.setTitle({
+        title: `${pending.length} bookmark${pending.length > 1 ? "s" : ""} awaiting confirmation`,
+      });
+    } else {
+      await chrome.action.setBadgeText({ text: "" });
+      await chrome.action.setTitle({ title: "Foyer" });
+    }
+  } catch {
+    await chrome.action.setBadgeText({ text: "" });
   }
 }
 
@@ -206,21 +194,20 @@ async function onBookmarkCreated(id: string, bookmark: chrome.bookmarks.Bookmark
   const result = await addBookmarkToFoyer(bookmark.title, bookmark.url, folderName);
 
   if (result.added) {
-    // High confidence silent add
-    const prev = await chrome.action.getBadgeText({});
-    const count = (parseInt(prev || "0") + 1).toString();
-    await chrome.action.setBadgeText({ text: count });
-    await chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
-    await chrome.action.setTitle({ title: `Added to ${result.categoryName || "Foyer"}` });
-  } else if (!result.alreadyExists) {
-    // Not a duplicate — store as pending for user to confirm or classify
-    await storePendingBookmark({
-      title: bookmark.title,
-      url: bookmark.url,
-      folderHint: folderName,
-      classification: result.classification,
-      timestamp: Date.now(),
-    });
+    await updateBadge(1);
+  } else if (!result.alreadyExists && currentUser) {
+    // Not a duplicate — store as pending in Firestore for user to confirm
+    try {
+      await addPendingBookmark(
+        currentUser.uid,
+        bookmark.title,
+        bookmark.url,
+        normalizeUrl(bookmark.url),
+        folderName,
+        result.classification,
+      );
+      await setBadgeToPendingCount();
+    } catch { /* best-effort */ }
   }
 }
 
@@ -340,7 +327,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         const result = await addBookmarkToFoyer(tab.title, tab.url);
         sendResponse({ success: true, added: result.added, categoryName: result.categoryName });
-      })().catch((err) => console.error("Foyer: ADD_CURRENT_PAGE handler error:", err));
+      })().catch((err) => { console.error("Foyer: ADD_CURRENT_PAGE handler error:", err); sendResponse({ success: false, error: err.message }); });
       return true;
     }
 
@@ -350,7 +337,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         await refreshCategories();
         await syncAllBookmarks();
         sendResponse({ success: true });
-      })().catch((err) => console.error("Foyer: SYNC_ALL_BOOKMARKS handler error:", err));
+      })().catch((err) => { console.error("Foyer: SYNC_ALL_BOOKMARKS handler error:", err); sendResponse({ success: false, error: err.message }); });
       return true;
     }
 
@@ -372,16 +359,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case "GET_PENDING_BOOKMARKS": {
       (async () => {
-        const list = await getPendingList();
+        if (!currentUser) { sendResponse({ pendingBookmarks: [] }); return; }
+        const list = await getPendingBookmarks(currentUser.uid);
         sendResponse({ pendingBookmarks: list });
-      })().catch((err) => console.error("Foyer: GET_PENDING_BOOKMARKS handler error:", err));
+      })().catch((err) => { console.error("Foyer: GET_PENDING_BOOKMARKS handler error:", err); sendResponse({ success: false, error: err.message }); });
       return true;
     }
 
     case "CONFIRM_BOOKMARK": {
       (async () => {
         if (!currentUser) { sendResponse({ success: false, error: "not_signed_in" }); return; }
-        const { index, title, url, folderHint, categoryId } = message;
+        const { pendingId, title, url, folderHint, categoryId } = message;
         const classification = classifySite(title, url, cachedCategories, folderHint);
 
         const targetId = categoryId || classification.categoryId;
@@ -403,7 +391,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
 
         if (alreadyExists) {
-          await clearPendingBookmark(index);
+          await removePendingBookmark(currentUser.uid, pendingId);
+          await setBadgeToPendingCount();
           sendResponse({ success: false, error: "already_exists" });
           return;
         }
@@ -414,31 +403,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         try {
           await addSiteToCategory(currentUser.uid, targetId, site);
           await refreshCategories();
-          await clearPendingBookmark(index);
+          await removePendingBookmark(currentUser.uid, pendingId);
+          await setBadgeToPendingCount();
           const categoryName = cachedCategories.find(c => c.id === targetId)?.name;
           sendResponse({ success: true, categoryName });
         } catch {
           sendResponse({ success: false, error: "write_failed" });
         }
-      })().catch((err) => console.error("Foyer: CONFIRM_BOOKMARK handler error:", err));
+      })().catch((err) => { console.error("Foyer: CONFIRM_BOOKMARK handler error:", err); sendResponse({ success: false, error: err.message }); });
       return true;
     }
 
     case "SKIP_PENDING_BOOKMARK": {
       (async () => {
-        await clearPendingBookmark(message.index);
+        if (!currentUser) { sendResponse({ success: false }); return; }
+        await removePendingBookmark(currentUser.uid, message.pendingId);
+        await setBadgeToPendingCount();
         sendResponse({ success: true });
-      })().catch((err) => console.error("Foyer: SKIP_PENDING_BOOKMARK handler error:", err));
+      })().catch((err) => { console.error("Foyer: SKIP_PENDING_BOOKMARK handler error:", err); sendResponse({ success: false, error: err.message }); });
       return true;
     }
 
     case "CLEAR_PENDING_BOOKMARKS": {
       (async () => {
-        await chrome.storage.local.remove("pendingBookmarks");
-        await chrome.action.setBadgeText({ text: "" });
-        await chrome.action.setTitle({ title: "Foyer" });
+        if (!currentUser) { sendResponse({ success: false }); return; }
+        await clearAllPending(currentUser.uid);
+        await setBadgeToPendingCount();
         sendResponse({ success: true });
-      })().catch((err) => console.error("Foyer: CLEAR_PENDING_BOOKMARKS handler error:", err));
+      })().catch((err) => { console.error("Foyer: CLEAR_PENDING_BOOKMARKS handler error:", err); sendResponse({ success: false, error: err.message }); });
       return true;
     }
   }
@@ -449,4 +441,5 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 export default defineBackground(() => {
   chrome.bookmarks.onCreated.addListener(onBookmarkCreated);
   startPolling();
+  restoreQueue();
 });

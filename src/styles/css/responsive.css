@@ -215,6 +215,15 @@
         width: 100%;
         justify-content: center;
     }
+
+    /* Import table scrollable on mobile */
+    .import-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .import-table {
+        min-width: 600px;
+    }
 }
 
 /* Tablet screens - wallpaper fix for devices like Samsung Tab A9 */

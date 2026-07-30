@@ -14,24 +14,36 @@ export function useLocation() {
   const { user } = useAuth();
   const [location, setLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const uidRef = useRef(user?.uid);
   uidRef.current = user?.uid;
 
-  useEffect(() => {
+  const loadLocation = useCallback(() => {
     const uid = uidRef.current;
     let cancelled = false;
 
-    const stored = localStorage.getItem(foyerKey("weather_location", uid));
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as LocationData;
-        if (parsed.lat && parsed.lon) {
-          setLocation(parsed);
-          setLoading(false);
-          return;
+    setLoading(true);
+    setError(null);
+
+    const saved = () => {
+      const stored = localStorage.getItem(foyerKey("weather_location", uid));
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as LocationData;
+          if (parsed.lat && parsed.lon) {
+            setLocation(parsed);
+            setLoading(false);
+            return true;
+          }
+        } catch (err) {
+          console.error("Failed to parse stored location:", err);
         }
-      } catch {}
-    }
+      }
+      return false;
+    };
+
+    if (saved()) return;
 
     const save = (loc: LocationData) => {
       if (cancelled) return;
@@ -52,7 +64,8 @@ export function useLocation() {
             if (cancelled) return;
             const city = data.city || data.locality || data.countryName || "Unknown";
             save({ lat: latitude, lon: longitude, city });
-          } catch {
+          } catch (err) {
+            console.error("Reverse geocode failed:", err);
             if (!cancelled) save({ lat: latitude, lon: longitude, city: "Unknown" });
           }
           if (!cancelled) setLoading(false);
@@ -75,6 +88,11 @@ export function useLocation() {
     };
   }, []);
 
+  useEffect(() => {
+    const cleanup = loadLocation();
+    return cleanup;
+  }, [loadLocation, retryCount]);
+
   const setCustomLocation = useCallback(async (city: string) => {
     try {
       const res = await fetch(
@@ -88,9 +106,13 @@ export function useLocation() {
         setLocation(loc);
         return true;
       }
-    } catch {}
+      } catch (err) {
+        console.error("Geocoding search failed:", err);
+      }
     return false;
   }, []);
 
-  return { location, loading, setCustomLocation };
+  const retry = useCallback(() => setRetryCount((c) => c + 1), []);
+
+  return { location, loading, error, setCustomLocation, retry };
 }

@@ -3,7 +3,7 @@
 import { useWeather } from "@/hooks/useWeather";
 
 export default function WeatherWidget() {
-  const { weather, loading, location } = useWeather();
+  const { weather, loading, location, error, retry } = useWeather();
 
   if (loading) {
     return (
@@ -12,6 +12,18 @@ export default function WeatherWidget() {
           <div className="weather-skeleton-icon"></div>
           <div className="weather-skeleton-line"></div>
           <div className="weather-skeleton-line short"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !weather) {
+    return (
+      <div className="widget widget-weather">
+        <div className="widget-error">
+          <span className="widget-error-icon">🌡️</span>
+          <span className="widget-error-msg">{error}</span>
+          <button className="btn-retry" onClick={retry}>Retry</button>
         </div>
       </div>
     );

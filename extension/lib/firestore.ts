@@ -1,6 +1,9 @@
-import { doc, collection as fsCollection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import {
+  doc, collection as fsCollection, getDocs, setDoc, deleteDoc, writeBatch,
+  addDoc, query, where, orderBy, Timestamp,
+} from "firebase/firestore";
 import { db } from "./firebase";
-import type { Category, Website } from "../shared/types";
+import type { Category, Website, PendingBookmark } from "../shared/types";
 
 export async function getCategories(uid: string): Promise<Category[]> {
   const catsSnap = await getDocs(fsCollection(db, "users", uid, "categories"));
@@ -72,6 +75,67 @@ export async function clearCategories(uid: string): Promise<void> {
     }
     const catRef = doc(fsCollection(db, "users", uid, "categories"), cat.id);
     batch.delete(catRef);
+  }
+  await batch.commit();
+}
+
+export async function addPendingBookmark(
+  uid: string,
+  title: string,
+  url: string,
+  normalizedUrl: string,
+  folder: string | undefined,
+  classification: { confidence: string; matchedBy: string; suggestedCategoryName?: string | null },
+): Promise<string> {
+  const ref = await addDoc(fsCollection(db, "users", uid, "pendingBookmarks"), {
+    title,
+    url,
+    normalizedUrl,
+    folder: folder || null,
+    suggestedCategoryName: classification.suggestedCategoryName || null,
+    confidence: classification.confidence,
+    matchedBy: classification.matchedBy,
+    source: "extension",
+    timestamp: Timestamp.now().toMillis(),
+    status: "pending",
+  });
+  return ref.id;
+}
+
+export async function getPendingBookmarks(uid: string): Promise<PendingBookmark[]> {
+  const q = query(
+    fsCollection(db, "users", uid, "pendingBookmarks"),
+    where("status", "==", "pending"),
+    orderBy("timestamp", "desc"),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      title: data.title,
+      url: data.url,
+      normalizedUrl: data.normalizedUrl,
+      folder: data.folder || undefined,
+      suggestedCategoryName: data.suggestedCategoryName || undefined,
+      confidence: data.confidence,
+      matchedBy: data.matchedBy,
+      source: data.source,
+      timestamp: data.timestamp,
+      status: data.status,
+    } as PendingBookmark;
+  });
+}
+
+export async function removePendingBookmark(uid: string, id: string): Promise<void> {
+  await deleteDoc(doc(db, "users", uid, "pendingBookmarks", id));
+}
+
+export async function clearAllPending(uid: string): Promise<void> {
+  const items = await getPendingBookmarks(uid);
+  const batch = writeBatch(db);
+  for (const item of items) {
+    batch.delete(doc(db, "users", uid, "pendingBookmarks", item.id));
   }
   await batch.commit();
 }

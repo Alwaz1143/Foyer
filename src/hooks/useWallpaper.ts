@@ -24,6 +24,7 @@ export function useWallpaper() {
   const [enabled, setEnabled] = useState(() => getEnabled());
   const [photo, setPhoto] = useState<CachedWallpaper | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Re-read settings when user changes (sign-out / sign-in)
   useEffect(() => {
@@ -89,7 +90,8 @@ export function useWallpaper() {
       if (!cached?.previewUrl) return false;
       applyPhoto(cached, cached.previewUrl, cached.highResUrl);
       return true;
-    } catch {
+    } catch (err) {
+      console.error("Failed to restore cached wallpaper:", err);
       return false;
     }
   }, [applyPhoto]);
@@ -97,6 +99,7 @@ export function useWallpaper() {
   const fetchWallpaper = useCallback(async () => {
     if (!UNSPLASH_CONFIG.accessKey) return;
     setLoading(true);
+    setError(null);
     try {
       const keyword = getRandomKeyword();
       const orientation = window.innerHeight > window.innerWidth ? "portrait" : "landscape";
@@ -120,6 +123,7 @@ export function useWallpaper() {
       applyPhoto(photoData, photoData.previewUrl, highResUrl);
     } catch (err) {
       console.error("Failed to fetch Unsplash wallpaper:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch wallpaper");
     } finally {
       setLoading(false);
     }
@@ -154,12 +158,19 @@ export function useWallpaper() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const retry = useCallback(() => {
+    setError(null);
+    fetchWallpaper();
+  }, [fetchWallpaper]);
+
   return {
     enabled,
     photo,
     loading,
+    error,
     fetchWallpaper,
     toggleWallpaper,
     disableWallpaper,
+    retry,
   };
 }

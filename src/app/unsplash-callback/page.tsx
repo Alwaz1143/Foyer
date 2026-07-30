@@ -2,8 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import { foyerKey } from "@/lib/storage";
 import "@/styles/css/auth.css";
 
@@ -54,19 +53,6 @@ function CallbackInner() {
 
         setStatus("saving");
         setMessage("Saving to your account...");
-
-        await setDoc(
-          doc(db, "users", user.uid),
-          {
-            unsplash: {
-              accessToken: data.accessToken,
-              username: data.username,
-              foyerCollectionId: data.foyerCollectionId,
-              connectedAt: new Date().toISOString(),
-            },
-          },
-          { merge: true }
-        );
 
         localStorage.setItem(foyerKey("unsplash_connection", user.uid), JSON.stringify({
           accessToken: data.accessToken,
