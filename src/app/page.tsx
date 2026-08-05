@@ -6,6 +6,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallpaper } from "@/hooks/useWallpaper";
 import { useUnsplash } from "@/hooks/useUnsplash";
+import WallpaperPicker from "@/components/WallpaperPicker";
 import { useSearch } from "@/hooks/useSearch";
 import { useCategories } from "@/contexts/CategoriesContext";
 import { classifySite } from "@/lib/classifySite";
@@ -37,8 +38,9 @@ export default function HomePage() {
   const uidRef = useRef<string | null>(null);
   uidRef.current = user?.uid ?? null;
   const [showUncategorizedActions, setShowUncategorizedActions] = useState(false);
-  const { toggleWallpaper } = useWallpaper();
+  const { toggleWallpaper, setWallpaper } = useWallpaper();
   const { connected, startOAuth } = useUnsplash();
+  const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   useSearch();
   const { settings: widgetSettings, setSetting } = useWidgetSettings();
   const { categories, addSite, editSite, moveSite, addCategory, editCategory, deleteCategory, replaceAll, importBookmarks } = useCategories();
@@ -1129,7 +1131,17 @@ export default function HomePage() {
         <a id="imageLink" href="#" target="_blank" rel="noopener noreferrer" title="Save to Foyer collection"><i className="fa-solid fa-heart"></i></a>
         <span>Photo by <a id="photographerLink" href="#" target="_blank" rel="noopener noreferrer"></a> on <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></span>
         <button id="wallpaperToggle" className="wallpaper-reload-btn" aria-label="Load new wallpaper" title="Load new wallpaper"><i className="fa-solid fa-arrows-rotate"></i></button>
+        <button id="wallpaperPickerBtn" className="wallpaper-reload-btn" aria-label="Open wallpaper picker" title="Browse wallpapers"
+          onClick={() => setShowWallpaperPicker(true)}><i className="fa-solid fa-images"></i></button>
       </div>
+
+      <WallpaperPicker
+        open={showWallpaperPicker}
+        onClose={() => setShowWallpaperPicker(false)}
+        connected={connected}
+        startOAuth={startOAuth}
+        setWallpaper={setWallpaper}
+      />
     </AuthGuard>
   );
 }

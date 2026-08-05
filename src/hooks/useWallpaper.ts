@@ -163,6 +163,12 @@ export function useWallpaper() {
     fetchWallpaper();
   }, [fetchWallpaper]);
 
+  // Apply a specific wallpaper picked from the Wallpaper Picker (caches + applies)
+  const setWallpaper = useCallback((photoData: CachedWallpaper) => {
+    localStorage.setItem(WALLPAPER_CACHE_KEY, JSON.stringify(photoData));
+    applyPhoto(photoData, photoData.previewUrl, photoData.highResUrl);
+  }, [applyPhoto]);
+
   return {
     enabled,
     photo,
@@ -172,5 +178,6 @@ export function useWallpaper() {
     toggleWallpaper,
     disableWallpaper,
     retry,
+    setWallpaper,
   };
 }
