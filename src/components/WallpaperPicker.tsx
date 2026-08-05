@@ -11,11 +11,12 @@ interface Props {
   connected: boolean;
   startOAuth: () => void;
   setWallpaper: (photo: CachedWallpaper) => void;
+  markAsLiked: (photoId: string) => void;
 }
 
 type Tab = "foyer" | "browse";
 
-export default function WallpaperPicker({ open, onClose, connected, startOAuth, setWallpaper }: Props) {
+export default function WallpaperPicker({ open, onClose, connected, startOAuth, setWallpaper, markAsLiked }: Props) {
   const [tab, setTab] = useState<Tab>("foyer");
   const [searchInput, setSearchInput] = useState("");
   const picker = useWallpaperPicker();
@@ -33,7 +34,10 @@ export default function WallpaperPicker({ open, onClose, connected, startOAuth, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const handlePick = useCallback((photo: WallpaperPhoto) => {
+  const handlePick = useCallback((photo: WallpaperPhoto, fromFoyer: boolean) => {
+    // Photos from the Foyer collection are liked by definition — mirror them into
+    // the local liked list so the existing refreshHeart keeps the heart red.
+    if (fromFoyer) markAsLiked(photo.id);
     const photoData: CachedWallpaper = {
       id: photo.id,
       photoUrl: photo.photoUrl,
@@ -45,7 +49,7 @@ export default function WallpaperPicker({ open, onClose, connected, startOAuth, 
     setWallpaper(photoData);
     showToast("Wallpaper set ✨");
     onClose();
-  }, [setWallpaper, onClose]);
+  }, [markAsLiked, setWallpaper, onClose]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +73,7 @@ export default function WallpaperPicker({ open, onClose, connected, startOAuth, 
 
   if (!open) return null;
 
-  const photoGrid = (photos: WallpaperPhoto[], loading: boolean, error: string | null, onRetry: () => void, empty: React.ReactNode) => {
+  const photoGrid = (photos: WallpaperPhoto[], loading: boolean, error: string | null, onRetry: () => void, empty: React.ReactNode, fromFoyer: boolean) => {
     if (loading) {
       return (
         <div className="wallpaper-grid">
@@ -95,7 +99,7 @@ export default function WallpaperPicker({ open, onClose, connected, startOAuth, 
           <div key={photo.id} className="wallpaper-photo-card">
             <img src={photo.previewUrl} alt={photo.photographerName} loading="lazy" />
             <div className="wallpaper-photo-overlay">
-              <button className="btn-set-wallpaper" onClick={() => handlePick(photo)}>
+              <button className="btn-set-wallpaper" onClick={() => handlePick(photo, fromFoyer)}>
                 <i className="fa-solid fa-image"></i> Set as wallpaper
               </button>
             </div>
@@ -176,7 +180,8 @@ export default function WallpaperPicker({ open, onClose, connected, startOAuth, 
                   <span className="wallpaper-empty-icon">💛</span>
                   <p className="wallpaper-empty-title">No favorites yet</p>
                   <p className="wallpaper-empty-desc">Tap the ❤️ on a wallpaper to save it to your Foyer collection — it will show up here.</p>
-                </>
+                </>,
+                true
               )
             )
           ) : (
@@ -202,7 +207,7 @@ export default function WallpaperPicker({ open, onClose, connected, startOAuth, 
                     <span className="collection-header-title" title={picker.activeCollection.title}>{picker.activeCollection.title}</span>
                     <span className="collection-header-count">{picker.activeCollection.totalPhotos} photos</span>
                   </div>
-                  {photoGrid(picker.collectionPhotos, picker.browseLoading, picker.browseError, () => picker.openCollection(picker.activeCollection!), <>No photos in this collection.</>)}
+                  {photoGrid(picker.collectionPhotos, picker.browseLoading, picker.browseError, () => picker.openCollection(picker.activeCollection!), <>No photos in this collection.</>, false)}
                 </>
               ) : picker.searchQuery ? (
                 <>

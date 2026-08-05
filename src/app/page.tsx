@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWallpaper } from "@/hooks/useWallpaper";
 import { useUnsplash } from "@/hooks/useUnsplash";
 import WallpaperPicker from "@/components/WallpaperPicker";
+import MediaPlayer from "@/components/MediaPlayer";
 import { useSearch } from "@/hooks/useSearch";
 import { useCategories } from "@/contexts/CategoriesContext";
 import { classifySite } from "@/lib/classifySite";
@@ -39,7 +40,7 @@ export default function HomePage() {
   uidRef.current = user?.uid ?? null;
   const [showUncategorizedActions, setShowUncategorizedActions] = useState(false);
   const { toggleWallpaper, setWallpaper } = useWallpaper();
-  const { connected, startOAuth } = useUnsplash();
+  const { connected, startOAuth, markAsLiked } = useUnsplash();
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   useSearch();
   const { settings: widgetSettings, setSetting } = useWidgetSettings();
@@ -1141,7 +1142,10 @@ export default function HomePage() {
         connected={connected}
         startOAuth={startOAuth}
         setWallpaper={setWallpaper}
+        markAsLiked={markAsLiked}
       />
+
+      <MediaPlayer />
     </AuthGuard>
   );
 }

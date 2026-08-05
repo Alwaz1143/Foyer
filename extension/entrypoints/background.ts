@@ -6,6 +6,14 @@ import type { ClassificationResult } from "../shared/classifySite";
 import { normalizeUrl } from "../shared/normalizeUrl";
 import { getRootDomain, generateSiteId } from "../shared/utils";
 import type { Category, Website } from "../shared/types";
+import {
+  hasMediaController,
+  getMediaSessionInfo,
+  sendMediaAction,
+  registerMediaControllerEvents,
+  type MediaControllerAction,
+  type MediaSessionInfo,
+} from "../lib/mediaController";
 
 interface BookmarkNode extends chrome.bookmarks.BookmarkTreeNode {
   children?: BookmarkNode[];
@@ -303,7 +311,156 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.action.setBadgeText({ text: "!" });
     chrome.action.setBadgeBackgroundColor({ color: "#e94560" });
   }
+  seedMediaTracker();
 });
+
+// ── Media tracker (mini player) ─────────────────────────────────────────────
+// Detects tabs playing media via `tabs.audible` and exposes state for the
+// Foyer page's mini player through chrome.storage.local. Rich metadata and
+// controls come from chrome.mediaController (Chrome 132+); older browsers get
+// a minimal title/favicon state with disabled controls.
+
+export interface MediaPlayerState {
+  active: boolean;
+  tabId?: number;
+  tabTitle?: string;
+  favIconUrl?: string;
+  sourceUrl?: string;
+  sourceDomain?: string;
+  title?: string;
+  artist?: string;
+  album?: string;
+  artworkUrl?: string;
+  playing?: boolean;
+  canNext?: boolean;
+  canPrev?: boolean;
+  controlsAvailable?: boolean;
+}
+
+const MEDIA_STATE_KEY = "foyer_media_state";
+
+interface CurrentMedia {
+  tabId: number;
+  windowId: number;
+  title: string;
+  favIconUrl?: string;
+  url?: string;
+  audible: boolean;
+}
+
+let currentMedia: CurrentMedia | null = null;
+let mediaSessionInfo: MediaSessionInfo | null = null;
+let mediaSessionKeys: string[] | null = null;
+
+function getHostname(url?: string): string {
+  try {
+    return new URL(url || "").hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+async function writeMediaState(): Promise<void> {
+  const state: MediaPlayerState = { active: !!currentMedia };
+  if (currentMedia) {
+    state.tabId = currentMedia.tabId;
+    state.tabTitle = currentMedia.title;
+    state.favIconUrl = currentMedia.favIconUrl;
+    state.sourceUrl = currentMedia.url;
+    state.sourceDomain = getHostname(currentMedia.url);
+    state.playing = currentMedia.audible;
+    state.title = mediaSessionInfo?.title || currentMedia.title;
+    state.artist = mediaSessionInfo?.artist || "";
+    state.album = mediaSessionInfo?.album || "";
+    state.artworkUrl = mediaSessionInfo?.artworkUrl || currentMedia.favIconUrl;
+    state.controlsAvailable = hasMediaController();
+    const keys = mediaSessionKeys;
+    state.canNext = keys ? keys.includes("nexttrack") || keys.includes("next") : hasMediaController();
+    state.canPrev = keys ? keys.includes("previoustrack") || keys.includes("previous") : hasMediaController();
+  }
+  lastMediaState = state;
+  try {
+    await chrome.storage.local.set({ [MEDIA_STATE_KEY]: state });
+  } catch { /* storage write failed — state still cached in memory */ }
+}
+
+async function refreshMediaState(): Promise<void> {
+  mediaSessionInfo = await getMediaSessionInfo();
+  await writeMediaState();
+}
+
+function setCurrentMedia(tab: chrome.tabs.Tab): void {
+  currentMedia = {
+    tabId: tab.id ?? 0,
+    windowId: tab.windowId,
+    title: tab.title || "Playing media",
+    favIconUrl: tab.favIconUrl || undefined,
+    url: tab.url || undefined,
+    audible: !!tab.audible,
+  };
+  mediaSessionKeys = null;
+  refreshMediaState();
+}
+
+function clearCurrentMedia(): void {
+  if (!currentMedia) return;
+  currentMedia = null;
+  mediaSessionInfo = null;
+  mediaSessionKeys = null;
+  writeMediaState();
+}
+
+// mediaController events (metadata / playback state / supported keys changed)
+registerMediaControllerEvents(() => {
+  refreshMediaState();
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.audible !== undefined) {
+    if (tab.audible) {
+      setCurrentMedia(tab);
+    } else if (currentMedia?.tabId === tabId) {
+      // Paused or muted — keep the player visible so it can be resumed
+      currentMedia = { ...currentMedia, audible: false };
+      writeMediaState();
+    }
+  }
+  // Source tab navigated away without playing → drop it
+  if (changeInfo.url && currentMedia?.tabId === tabId && !tab.audible) {
+    clearCurrentMedia();
+  }
+  // Keep the source tab's title/favicon fresh
+  if (currentMedia?.tabId === tabId && (changeInfo.title || changeInfo.favIconUrl)) {
+    currentMedia = {
+      ...currentMedia,
+      title: tab.title || currentMedia.title,
+      favIconUrl: tab.favIconUrl || currentMedia.favIconUrl,
+    };
+    writeMediaState();
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (currentMedia?.tabId === tabId) clearCurrentMedia();
+});
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.audible) setCurrentMedia(tab);
+  } catch { /* tab may be gone already */ }
+});
+
+async function seedMediaTracker(): Promise<void> {
+  try {
+    const active = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (active[0]?.audible) { setCurrentMedia(active[0]); return; }
+    const audible = await chrome.tabs.query({ audible: true });
+    if (audible[0]) setCurrentMedia(audible[0]);
+  } catch { /* ignore */ }
+}
+
+chrome.runtime.onStartup.addListener(seedMediaTracker);
 
 // ── Message Handlers ─────────────────────────────────────────────────────────
 
@@ -353,6 +510,27 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case "SET_MIRROR_DELETIONS": {
       mirrorDeletions = message.value;
+      sendResponse({ success: true });
+      return;
+    }
+
+    case "GET_MEDIA_STATE": {
+      (async () => {
+        const stored = await chrome.storage.local.get(MEDIA_STATE_KEY);
+        sendResponse({ state: stored[MEDIA_STATE_KEY] || { active: false } });
+      })().catch((err) => { console.error("Foyer: GET_MEDIA_STATE handler error:", err); sendResponse({ state: { active: false } }); });
+      return true;
+    }
+
+    case "MEDIA_ACTION": {
+      if (message.action === "focusTab") {
+        if (!currentMedia) { sendResponse({ success: false }); return; }
+        chrome.tabs.update(currentMedia.tabId, { active: true });
+        chrome.windows.update(currentMedia.windowId, { focused: true });
+        sendResponse({ success: true });
+        return;
+      }
+      sendMediaAction(message.action as MediaControllerAction);
       sendResponse({ success: true });
       return;
     }

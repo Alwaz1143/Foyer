@@ -96,6 +96,25 @@ export function useUnsplash() {
     window.location.href = url;
   }, [clientId]);
 
+  // Add a photo id to the local liked mirror (keeps the heart red on any path)
+  const markAsLiked = useCallback((photoId: string) => {
+    if (!photoId) return;
+    try {
+      const uid = uidRef.current;
+      const likedKey = foyerKey("unsplash_liked_photos", uid);
+      const liked: string[] = JSON.parse(
+        localStorage.getItem(likedKey) ||
+        localStorage.getItem("unsplash_liked_photos") ||
+        "[]"
+      );
+      if (!liked.includes(photoId)) {
+        liked.push(photoId);
+        localStorage.setItem(likedKey, JSON.stringify(liked));
+      }
+    } catch { /* ignore */ }
+    refreshHeart();
+  }, [refreshHeart]);
+
   // Add current photo to Unsplash collection
   const addToCollection = useCallback(async (photoId: string | null) => {
     if (!accessToken || !photoId) return false;
@@ -145,22 +164,8 @@ export function useUnsplash() {
       });
 
       if (res.ok || res.status === 422) {
-        // Save to liked list
-        try {
-          const uid = uidRef.current;
-          const likedKey = foyerKey("unsplash_liked_photos", uid);
-          const liked: string[] = JSON.parse(
-            localStorage.getItem(likedKey) ||
-            localStorage.getItem("unsplash_liked_photos") ||
-            "[]"
-          );
-          if (!liked.includes(photoId)) {
-            liked.push(photoId);
-            localStorage.setItem(likedKey, JSON.stringify(liked));
-          }
-        } catch { /* ignore */ }
-        // Immediately reflect the red heart
-        refreshHeart();
+        // Save to liked list (keeps heart red on future loads too)
+        markAsLiked(photoId);
         showToast("Added to your Foyer collection on Unsplash 💛");
         return true;
       }
@@ -172,7 +177,7 @@ export function useUnsplash() {
     } finally {
       imageLink?.classList.remove("heart-loading");
     }
-  }, [accessToken, collectionId, user, refreshHeart]);
+  }, [accessToken, collectionId, user, markAsLiked]);
 
   // Wire up heart button click and unsplash popup
   useEffect(() => {
@@ -216,5 +221,5 @@ export function useUnsplash() {
     };
   }, [connected, addToCollection, startOAuth]);
 
-  return { connected, username, loading, startOAuth };
+  return { connected, username, loading, startOAuth, markAsLiked };
 }
