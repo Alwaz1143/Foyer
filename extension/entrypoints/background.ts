@@ -346,6 +346,8 @@ interface CurrentMedia {
   favIconUrl?: string;
   url?: string;
   audible: boolean;
+  playing?: boolean;
+  controlViaContentScript?: boolean;
 }
 
 let currentMedia: CurrentMedia | null = null;
@@ -368,17 +370,21 @@ async function writeMediaState(): Promise<void> {
     state.favIconUrl = currentMedia.favIconUrl;
     state.sourceUrl = currentMedia.url;
     state.sourceDomain = getHostname(currentMedia.url);
-    state.playing = currentMedia.audible;
+    state.playing = currentMedia.playing ?? currentMedia.audible;
+    const domControls = !!currentMedia.controlViaContentScript;
     state.title = mediaSessionInfo?.title || currentMedia.title;
     state.artist = mediaSessionInfo?.artist || "";
     state.album = mediaSessionInfo?.album || "";
-    state.artworkUrl = mediaSessionInfo?.artworkUrl || currentMedia.favIconUrl;
-    state.controlsAvailable = hasMediaController();
+    state.artworkUrl = mediaSessionInfo?.artworkUrl;
+    state.controlsAvailable = domControls || hasMediaController();
     const keys = mediaSessionKeys;
-    state.canNext = keys ? keys.includes("nexttrack") || keys.includes("next") : hasMediaController();
-    state.canPrev = keys ? keys.includes("previoustrack") || keys.includes("previous") : hasMediaController();
+    state.canNext = domControls
+      ? true
+      : keys ? keys.includes("nexttrack") || keys.includes("next") : hasMediaController();
+    state.canPrev = domControls
+      ? true
+      : keys ? keys.includes("previoustrack") || keys.includes("previous") : hasMediaController();
   }
-  lastMediaState = state;
   try {
     await chrome.storage.local.set({ [MEDIA_STATE_KEY]: state });
   } catch { /* storage write failed — state still cached in memory */ }
@@ -397,6 +403,10 @@ function setCurrentMedia(tab: chrome.tabs.Tab): void {
     favIconUrl: tab.favIconUrl || undefined,
     url: tab.url || undefined,
     audible: !!tab.audible,
+    controlViaContentScript: (() => {
+      const host = getHostname(tab.url);
+      return host === "youtube.com" || host === "music.youtube.com";
+    })(),
   };
   mediaSessionKeys = null;
   refreshMediaState();
@@ -460,6 +470,59 @@ async function seedMediaTracker(): Promise<void> {
   } catch { /* ignore */ }
 }
 
+/**
+ * Apply a Spotify snapshot (from a SPOTIFY_STATE message or a fresh ping) to
+ * the tracked media state. Idle snapshots drop the tab if it's tracked.
+ */
+function applySpotifySnapshot(snap: any, tab: chrome.tabs.Tab): void {
+  if (!tab.id) return;
+  if (!snap.title && !snap.playing) {
+    if (currentMedia?.tabId === tab.id) clearCurrentMedia();
+    return;
+  }
+  currentMedia = {
+    tabId: tab.id,
+    windowId: tab.windowId,
+    title: tab.title || snap.title || "Spotify",
+    favIconUrl: tab.favIconUrl || undefined,
+    url: tab.url || undefined,
+    audible: false,
+    playing: !!snap.playing,
+    controlViaContentScript: true,
+  };
+  mediaSessionInfo = {
+    title: snap.title || undefined,
+    artist: snap.artist || undefined,
+    album: snap.album || undefined,
+    artworkUrl: snap.artworkUrl || undefined,
+  };
+  mediaSessionKeys = null;
+  writeMediaState();
+}
+
+/**
+ * Ask every open Spotify web tab for its current playback snapshot (used when
+ * Foyer loads — the audible scan can't see Spotify tabs). Returns the last
+ * tab that reports media, or null.
+ */
+async function pingSpotifyTabs(): Promise<{ snap: any; tab: chrome.tabs.Tab } | null> {
+  try {
+    const tabs = await chrome.tabs.query({ url: "https://open.spotify.com/*" });
+    let result: { snap: any; tab: chrome.tabs.Tab } | null = null;
+    await Promise.allSettled(tabs.map(async (tab) => {
+      if (!tab.id) return;
+      try {
+        const res: any = await chrome.tabs.sendMessage(tab.id, { type: "SPOTIFY_PING" });
+        const snap = res?.state;
+        if (snap && (snap.title || snap.playing)) result = { snap, tab };
+      } catch { /* no content script on this tab */ }
+    }));
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 chrome.runtime.onStartup.addListener(seedMediaTracker);
 
 // ── Message Handlers ─────────────────────────────────────────────────────────
@@ -516,6 +579,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case "GET_MEDIA_STATE": {
       (async () => {
+        if (!currentMedia) {
+          await seedMediaTracker();
+        }
+        if (!currentMedia?.controlViaContentScript) {
+          const pinged = await pingSpotifyTabs();
+          if (pinged) applySpotifySnapshot(pinged.snap, pinged.tab);
+        }
+        if (!currentMedia) {
+          try { await chrome.storage.local.remove(MEDIA_STATE_KEY); } catch { /* ignore */ }
+          sendResponse({ state: { active: false } });
+          return;
+        }
+        await writeMediaState();
         const stored = await chrome.storage.local.get(MEDIA_STATE_KEY);
         sendResponse({ state: stored[MEDIA_STATE_KEY] || { active: false } });
       })().catch((err) => { console.error("Foyer: GET_MEDIA_STATE handler error:", err); sendResponse({ state: { active: false } }); });
@@ -530,10 +606,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ success: true });
         return;
       }
-      sendMediaAction(message.action as MediaControllerAction);
+      const action = message.action as MediaControllerAction;
+      if (currentMedia?.controlViaContentScript) {
+        (async () => {
+          try {
+            const res = await chrome.tabs.sendMessage(currentMedia.tabId, { type: "PAGE_MEDIA_CONTROL", action });
+            if (res?.clicked) { sendResponse({ success: true }); return; }
+          } catch { /* no content script on the tab */ }
+          sendMediaAction(action);
+          sendResponse({ success: true });
+        })();
+        return true;
+      }
+      sendMediaAction(action);
       sendResponse({ success: true });
       return;
     }
+
+case "SPOTIFY_STATE": {
+  const senderTab = _sender.tab;
+  const snap = message.state || {};
+  if (!senderTab?.id) { sendResponse({ success: false }); return; }
+  applySpotifySnapshot(snap, senderTab);
+  sendResponse({ success: true });
+  return;
+}
 
     case "GET_PENDING_BOOKMARKS": {
       (async () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMediaPlayer } from "@/hooks/useMediaPlayer";
 
 /**
@@ -9,6 +10,21 @@ import { useMediaPlayer } from "@/hooks/useMediaPlayer";
  */
 export default function MediaPlayer() {
   const { state, playPause, next, prev, focusTab } = useMediaPlayer();
+
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const [marquee, setMarquee] = useState(false);
+
+  const checkOverflow = useCallback(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    setMarquee(el.scrollWidth > el.clientWidth + 1);
+  }, []);
+
+  useEffect(() => {
+    checkOverflow();
+    window.addEventListener("resize", checkOverflow);
+    return () => window.removeEventListener("resize", checkOverflow);
+  }, [checkOverflow, state?.title]);
 
   if (!state?.active || !state.title) return null;
 
@@ -25,7 +41,9 @@ export default function MediaPlayer() {
         aria-label="Open playing tab"
       >
         {state.artworkUrl ? (
-          <img src={state.artworkUrl} alt="" loading="lazy" />
+          <img src={state.artworkUrl} alt="" className="media-player-art-img" loading="lazy" />
+        ) : state.favIconUrl ? (
+          <img src={state.favIconUrl} alt="" className="media-player-art-favicon" loading="lazy" />
         ) : (
           <span className="media-player-art-fallback">
             <i className="fa-solid fa-music"></i>
@@ -34,7 +52,17 @@ export default function MediaPlayer() {
       </button>
 
       <button className="media-player-info" onClick={focusTab} title="Open in tab">
-        <span className="media-player-title" title={title}>{title}</span>
+        <span
+          ref={titleRef}
+          className={`media-player-title${marquee ? " marquee" : ""}`}
+          title={marquee ? undefined : title}
+        >
+          {marquee ? (
+            <span className="media-player-title-track">{title}{title}</span>
+          ) : (
+            title
+          )}
+        </span>
         {subtitle && <span className="media-player-subtitle" title={subtitle}>{subtitle}</span>}
       </button>
 
