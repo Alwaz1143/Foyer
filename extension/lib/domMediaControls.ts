@@ -42,6 +42,8 @@ function controlsForHost(): DomainControls | null {
 function clickOnce(selector: string): boolean {
   const el = document.querySelector<HTMLElement>(selector);
   if (!el) return false;
+  if (el instanceof HTMLButtonElement && el.disabled) return false;
+  if (el.getAttribute("aria-disabled") === "true") return false;
   el.click();
   return true;
 }

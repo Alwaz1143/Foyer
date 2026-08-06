@@ -11,11 +11,15 @@ export default defineContentScript({
   matches: ["https://www.youtube.com/*", "https://music.youtube.com/*"],
   runAt: "document_idle",
   main() {
+    if ((window as any).__foyerYouTubeLoaded) return;
+    (window as any).__foyerYouTubeLoaded = true;
     console.log("[foyer] youtube content script active");
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "PAGE_MEDIA_CONTROL") {
-        sendResponse(handlePageMediaControl(message));
+        const res = handlePageMediaControl(message);
+        console.log("[foyer] PAGE_MEDIA_CONTROL", message.action, "->", res);
+        sendResponse(res);
       }
     });
   },

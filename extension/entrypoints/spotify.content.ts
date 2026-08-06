@@ -17,6 +17,15 @@ interface SpotifySnapshot {
   album?: string;
   artworkUrl?: string;
   playing: boolean;
+  canNext?: boolean;
+  canPrev?: boolean;
+}
+
+function isDisabled(selector: string): boolean {
+  const el = document.querySelector<HTMLElement>(selector);
+  if (!el) return false;
+  if (el instanceof HTMLButtonElement && el.disabled) return true;
+  return el.getAttribute("aria-disabled") === "true";
 }
 
 function readSnapshot(): SpotifySnapshot {
@@ -43,18 +52,30 @@ function readSnapshot(): SpotifySnapshot {
 
   const playing = ms?.playbackState === "playing";
 
-  return { title, artist, album, artworkUrl, playing };
+  return {
+    title,
+    artist,
+    album,
+    artworkUrl,
+    playing,
+    canNext: !isDisabled('[data-testid="control-button-skip-forward"]'),
+    canPrev: !isDisabled('[data-testid="control-button-skip-back"]'),
+  };
 }
 
 export default defineContentScript({
   matches: ["https://open.spotify.com/*"],
   runAt: "document_idle",
   main() {
+    if ((window as any).__foyerSpotifyLoaded) return;
+    (window as any).__foyerSpotifyLoaded = true;
     console.log("[foyer] spotify content script active");
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "PAGE_MEDIA_CONTROL") {
-        sendResponse(handlePageMediaControl(message));
+        const res = handlePageMediaControl(message);
+        console.log("[foyer] PAGE_MEDIA_CONTROL", message.action, "->", res);
+        sendResponse(res);
         return;
       }
       if (message?.type === "SPOTIFY_PING") {

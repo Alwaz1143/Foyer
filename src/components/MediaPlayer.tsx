@@ -14,6 +14,21 @@ export default function MediaPlayer() {
   const titleRef = useRef<HTMLSpanElement>(null);
   const [marquee, setMarquee] = useState(false);
 
+  // Optimistic play/pause: flip the icon immediately on click, reconcile when
+  // the next real state arrives (or give up after a timeout).
+  const [optimisticPlaying, setOptimisticPlaying] = useState<boolean | null>(null);
+  const playing = optimisticPlaying ?? !!state?.playing;
+
+  useEffect(() => {
+    setOptimisticPlaying(null);
+  }, [state?.playing, state?.title]);
+
+  useEffect(() => {
+    if (optimisticPlaying === null) return;
+    const t = setTimeout(() => setOptimisticPlaying(null), 1500);
+    return () => clearTimeout(t);
+  }, [optimisticPlaying]);
+
   const checkOverflow = useCallback(() => {
     const el = titleRef.current;
     if (!el) return;
@@ -31,6 +46,12 @@ export default function MediaPlayer() {
   const controlsAvailable = !!state.controlsAvailable;
   const title = state.title || state.tabTitle;
   const subtitle = [state.artist, state.album].filter(Boolean).join(" — ");
+
+  const onPlayPause = () => {
+    if (optimisticPlaying !== null) return; // wait for reconciliation
+    setOptimisticPlaying(!playing);
+    playPause();
+  };
 
   return (
     <div className="media-player" role="region" aria-label="Now playing">
@@ -78,12 +99,12 @@ export default function MediaPlayer() {
         </button>
         <button
           className="media-player-btn media-player-play"
-          onClick={playPause}
+          onClick={onPlayPause}
           disabled={!controlsAvailable}
-          title={state.playing ? "Pause" : "Play"}
-          aria-label={state.playing ? "Pause" : "Play"}
+          title={playing ? "Pause" : "Play"}
+          aria-label={playing ? "Pause" : "Play"}
         >
-          <i className={`fa-solid ${state.playing ? "fa-pause" : "fa-play"}`}></i>
+          <i className={`fa-solid ${playing ? "fa-pause" : "fa-play"}`}></i>
         </button>
         <button
           className="media-player-btn"

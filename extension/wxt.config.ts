@@ -5,7 +5,7 @@ export default defineConfig({
   manifest: {
     name: "Foyer",
     description: "Add sites to your Foyer dashboard and sync bookmarks across devices",
-    permissions: ["bookmarks", "storage", "tabs"],
+    permissions: ["bookmarks", "storage", "tabs", "scripting"],
     action: {},
     icons: {
       16: "icons/16.png",

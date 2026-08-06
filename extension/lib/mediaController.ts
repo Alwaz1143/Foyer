@@ -11,6 +11,10 @@ export interface MediaSessionInfo {
   artworkUrl?: string;
   canNext?: boolean;
   canPrev?: boolean;
+  /** The tab this session belongs to, when Chrome exposes it (getState). */
+  tabId?: number;
+  /** Playback state from the session (more accurate than tab.audible). */
+  playing?: boolean;
 }
 
 export type MediaControllerAction =
@@ -46,6 +50,13 @@ function extractMetadata(payload: any): MediaSessionInfo | null {
     artist: m.artist || m.albumArtist || undefined,
     album: m.album || undefined,
     artworkUrl: artwork || undefined,
+    tabId: typeof payload.tabId === "number" ? payload.tabId : undefined,
+    playing:
+      payload.playbackState === "playing"
+        ? true
+        : payload.playbackState === "paused"
+          ? false
+          : undefined,
   };
 }
 
@@ -99,11 +110,15 @@ export async function getMediaSessionInfo(): Promise<MediaSessionInfo | null> {
   }
 }
 
-/** Send a control command to the active media session. No-op when unsupported. */
-export async function sendMediaAction(action: MediaControllerAction): Promise<void> {
+/** Send a control command to the active media session. Returns true when the
+ * command was dispatched. No-op (false) when unsupported or errored. */
+export async function sendMediaAction(action: MediaControllerAction): Promise<boolean> {
   const mc = controller();
-  if (!mc || typeof mc[action] !== "function") return;
+  if (!mc || typeof mc[action] !== "function") return false;
   try {
     await mc[action]();
-  } catch { /* ignore */ }
+    return true;
+  } catch {
+    return false;
+  }
 }

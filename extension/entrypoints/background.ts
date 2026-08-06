@@ -348,11 +348,18 @@ interface CurrentMedia {
   audible: boolean;
   playing?: boolean;
   controlViaContentScript?: boolean;
+  /** When this tab last became the tracked media source (event ordering). */
+  lastAudibleAt: number;
+  /** Overrides from in-page snapshots (e.g. Spotify skip button states). */
+  canNext?: boolean;
+  canPrev?: boolean;
 }
 
 let currentMedia: CurrentMedia | null = null;
 let mediaSessionInfo: MediaSessionInfo | null = null;
 let mediaSessionKeys: string[] | null = null;
+
+const MEDIA_HOSTS = new Set(["youtube.com", "music.youtube.com", "open.spotify.com", "spotify.com"]);
 
 function getHostname(url?: string): string {
   try {
@@ -378,12 +385,12 @@ async function writeMediaState(): Promise<void> {
     state.artworkUrl = mediaSessionInfo?.artworkUrl;
     state.controlsAvailable = domControls || hasMediaController();
     const keys = mediaSessionKeys;
-    state.canNext = domControls
+    state.canNext = currentMedia.canNext ?? (domControls
       ? true
-      : keys ? keys.includes("nexttrack") || keys.includes("next") : hasMediaController();
-    state.canPrev = domControls
+      : keys ? keys.includes("nexttrack") || keys.includes("next") : hasMediaController());
+    state.canPrev = currentMedia.canPrev ?? (domControls
       ? true
-      : keys ? keys.includes("previoustrack") || keys.includes("previous") : hasMediaController();
+      : keys ? keys.includes("previoustrack") || keys.includes("previous") : hasMediaController());
   }
   try {
     await chrome.storage.local.set({ [MEDIA_STATE_KEY]: state });
@@ -391,7 +398,17 @@ async function writeMediaState(): Promise<void> {
 }
 
 async function refreshMediaState(): Promise<void> {
-  mediaSessionInfo = await getMediaSessionInfo();
+  const info = await getMediaSessionInfo();
+  if (currentMedia && info?.tabId && info.tabId !== currentMedia.tabId) {
+    // The session belongs to another tab — don't mix its metadata in
+    mediaSessionInfo = null;
+  } else {
+    mediaSessionInfo = info;
+    if (currentMedia && info?.playing !== undefined) {
+      // Session playback state is more accurate than tab.audible (e.g. muted tabs)
+      currentMedia = { ...currentMedia, playing: info.playing };
+    }
+  }
   await writeMediaState();
 }
 
@@ -407,6 +424,7 @@ function setCurrentMedia(tab: chrome.tabs.Tab): void {
       const host = getHostname(tab.url);
       return host === "youtube.com" || host === "music.youtube.com";
     })(),
+    lastAudibleAt: Date.now(),
   };
   mediaSessionKeys = null;
   refreshMediaState();
@@ -435,8 +453,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       writeMediaState();
     }
   }
-  // Source tab navigated away without playing → drop it
-  if (changeInfo.url && currentMedia?.tabId === tabId && !tab.audible) {
+  // Source tab navigated to a non-media site without playing → drop it.
+  // Same-domain SPA navigation (Spotify/YT Music browsing while paused) keeps it.
+  if (
+    changeInfo.url &&
+    currentMedia?.tabId === tabId &&
+    !tab.audible &&
+    !MEDIA_HOSTS.has(getHostname(tab.url))
+  ) {
     clearCurrentMedia();
   }
   // Keep the source tab's title/favicon fresh
@@ -450,8 +474,20 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (currentMedia?.tabId === tabId) clearCurrentMedia();
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  if (currentMedia?.tabId === tabId) { clearCurrentMedia(); return; }
+  // The worker may have restarted since the tab was tracked (in-memory state
+  // lost) — fall back to the stored state so closing the tab still hides the player.
+  try {
+    const stored = await chrome.storage.local.get(MEDIA_STATE_KEY);
+    const st = stored[MEDIA_STATE_KEY];
+    if (st?.tabId === tabId) {
+      currentMedia = null;
+      mediaSessionInfo = null;
+      mediaSessionKeys = null;
+      await writeMediaState();
+    }
+  } catch { /* ignore */ }
 });
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
@@ -462,13 +498,41 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 });
 
 async function seedMediaTracker(): Promise<void> {
+  // Keep the last-audible winner if it's still alive — don't churn on reseeds
+  if (currentMedia && (currentMedia.audible || currentMedia.playing)) return;
   try {
     const active = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (active[0]?.audible) { setCurrentMedia(active[0]); return; }
+    if (active[0]?.audible) {
+      setCurrentMedia(active[0]);
+      if (active[0].id) ensureMediaContentScript(active[0].id, getHostname(active[0].url));
+      return;
+    }
     const audible = await chrome.tabs.query({ audible: true });
-    if (audible[0]) setCurrentMedia(audible[0]);
+    if (audible[0]) {
+      setCurrentMedia(audible[0]);
+      if (audible[0].id) ensureMediaContentScript(audible[0].id, getHostname(audible[0].url));
+    }
   } catch { /* ignore */ }
 }
+
+/**
+ * Full media-state restore: audible-tab scan, then a Spotify ping for tabs the
+ * audible scan can't see. Runs on every worker start (reload, browser start,
+ * service-worker restart) and on Foyer page loads.
+ */
+async function restoreMediaState(): Promise<void> {
+  try {
+    if (!currentMedia) await seedMediaTracker();
+    if (!currentMedia?.controlViaContentScript) {
+      const pinged = await pingSpotifyTabs();
+      if (pinged) applySpotifySnapshot(pinged.snap, pinged.tab);
+    }
+  } catch { /* ignore */ }
+}
+
+// Restore tracking immediately when the worker starts — audible events don't
+// replay, so without this the player stays stale after an extension reload.
+restoreMediaState();
 
 /**
  * Apply a Spotify snapshot (from a SPOTIFY_STATE message or a fresh ping) to
@@ -489,6 +553,9 @@ function applySpotifySnapshot(snap: any, tab: chrome.tabs.Tab): void {
     audible: false,
     playing: !!snap.playing,
     controlViaContentScript: true,
+    lastAudibleAt: Date.now(),
+    canNext: snap.canNext,
+    canPrev: snap.canPrev,
   };
   mediaSessionInfo = {
     title: snap.title || undefined,
@@ -498,6 +565,28 @@ function applySpotifySnapshot(snap: any, tab: chrome.tabs.Tab): void {
   };
   mediaSessionKeys = null;
   writeMediaState();
+}
+
+/**
+ * Inject the media control content script into a tab on demand. Needed when a
+ * media tab predates the extension's last reload (content scripts are only
+ * auto-injected on page navigation), so both detection pings and DOM controls
+ * keep working without the user having to reload the media tab.
+ */
+async function ensureMediaContentScript(tabId: number, host: string): Promise<void> {
+  const path =
+    host === "youtube.com" || host === "music.youtube.com"
+      ? "content-scripts/youtube.js"
+      : host === "open.spotify.com"
+        ? "content-scripts/spotify.js"
+        : null;
+  if (!path) return;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: [path] });
+    console.log("[foyer] injected content script on tab", tabId);
+  } catch (e) {
+    console.log("[foyer] injection failed on tab", tabId, (e as Error)?.message);
+  }
 }
 
 /**
@@ -515,7 +604,16 @@ async function pingSpotifyTabs(): Promise<{ snap: any; tab: chrome.tabs.Tab } | 
         const res: any = await chrome.tabs.sendMessage(tab.id, { type: "SPOTIFY_PING" });
         const snap = res?.state;
         if (snap && (snap.title || snap.playing)) result = { snap, tab };
-      } catch { /* no content script on this tab */ }
+      } catch {
+        // No content script on this tab (it predates the extension reload) —
+        // inject it on the fly, then ask again.
+        await ensureMediaContentScript(tab.id, "open.spotify.com");
+        try {
+          const res: any = await chrome.tabs.sendMessage(tab.id, { type: "SPOTIFY_PING" });
+          const snap = res?.state;
+          if (snap && (snap.title || snap.playing)) result = { snap, tab };
+        } catch { /* injection failed — nothing we can do */ }
+      }
     }));
     return result;
   } catch {
@@ -523,9 +621,19 @@ async function pingSpotifyTabs(): Promise<{ snap: any; tab: chrome.tabs.Tab } | 
   }
 }
 
-chrome.runtime.onStartup.addListener(seedMediaTracker);
-
 // ── Message Handlers ─────────────────────────────────────────────────────────
+
+/** In-flight guard: ignores rapid repeats of the same media action (which
+ * would double-toggle the real player). Different actions still pass through. */
+let lastAction = "";
+let lastActionAt = 0;
+function debounceAction(action: string): boolean {
+  const now = Date.now();
+  if (lastAction === action && now - lastActionAt < 250) return false;
+  lastAction = action;
+  lastActionAt = now;
+  return true;
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   switch (message.type) {
@@ -579,13 +687,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case "GET_MEDIA_STATE": {
       (async () => {
-        if (!currentMedia) {
-          await seedMediaTracker();
-        }
-        if (!currentMedia?.controlViaContentScript) {
-          const pinged = await pingSpotifyTabs();
-          if (pinged) applySpotifySnapshot(pinged.snap, pinged.tab);
-        }
+        await restoreMediaState();
         if (!currentMedia) {
           try { await chrome.storage.local.remove(MEDIA_STATE_KEY); } catch { /* ignore */ }
           sendResponse({ state: { active: false } });
@@ -607,20 +709,40 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return;
       }
       const action = message.action as MediaControllerAction;
+      if (!debounceAction(action)) {
+        // Rapid repeat of the same action — would double-toggle the player
+        sendResponse({ success: true, performed: false });
+        return;
+      }
       if (currentMedia?.controlViaContentScript) {
         (async () => {
+          let performed = false;
           try {
             const res = await chrome.tabs.sendMessage(currentMedia.tabId, { type: "PAGE_MEDIA_CONTROL", action });
-            if (res?.clicked) { sendResponse({ success: true }); return; }
-          } catch { /* no content script on the tab */ }
-          sendMediaAction(action);
-          sendResponse({ success: true });
+            console.log("[foyer] MEDIA_ACTION dom path:", action, "clicked:", res?.clicked, "tabId:", currentMedia.tabId);
+            performed = !!res?.clicked;
+            if (performed) { sendResponse({ success: true, performed: true }); return; }
+          } catch (e) {
+            // Tab predates the extension reload — inject the script and retry
+            console.log("[foyer] MEDIA_ACTION dom path failed, injecting:", action, (e as Error)?.message);
+            await ensureMediaContentScript(currentMedia.tabId, getHostname(currentMedia.url));
+            try {
+              const res = await chrome.tabs.sendMessage(currentMedia.tabId, { type: "PAGE_MEDIA_CONTROL", action });
+              performed = !!res?.clicked;
+              if (performed) { sendResponse({ success: true, performed: true }); return; }
+            } catch { /* still no script */ }
+          }
+          performed = performed || (await sendMediaAction(action));
+          sendResponse({ success: true, performed });
         })();
         return true;
       }
-      sendMediaAction(action);
-      sendResponse({ success: true });
-      return;
+      console.log("[foyer] MEDIA_ACTION mediaController path:", action);
+      (async () => {
+        const performed = await sendMediaAction(action);
+        sendResponse({ success: true, performed });
+      })();
+      return true;
     }
 
 case "SPOTIFY_STATE": {
