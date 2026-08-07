@@ -322,6 +322,7 @@ body.wallpaper-active .category-section {
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.35);
   cursor: pointer;
+  position: relative;
   background: linear-gradient(
     135deg,
     var(--accent-primary, #667eea) 0%,
@@ -368,6 +369,10 @@ body.wallpaper-active .category-section {
 }
 
 .avatar-guest-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   font-size: 15px;
   color: rgba(255, 255, 255, 0.9);
   pointer-events: none;
