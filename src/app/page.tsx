@@ -536,7 +536,7 @@ export default function HomePage() {
       if (result.skipped > 0) summary += `, skipped <strong>${result.skipped}</strong> duplicates`;
       if (result.createdCategories.length > 0) summary += `<br>📁 Created sections: <strong>${result.createdCategories.join(", ")}</strong>`;
       if (highConfidenceOnly && result.pending.length > 0) {
-        summary += `<br>📋 <strong>${result.pending.length}</strong> bookmark${result.pending.length > 1 ? 's' : ''} saved for review — check the <i class="fas fa-bell"></i> badge on your avatar`;
+        summary += `<br>📋 <strong>${result.pending.length}</strong> bookmark${result.pending.length > 1 ? 's' : ''} saved for review — open your profile menu → Manage Uncategorized Apps`;
       }
       if (result.uncategorized.length > 0 && !autoCreate) {
         summary += `<br>⚠️ <strong>${result.uncategorized.length}</strong> bookmarks could not be categorized`;
@@ -716,11 +716,7 @@ export default function HomePage() {
           <span id="userAvatarInitials" className="avatar-initials"></span>
         </button>
         {pendingCount > 0 && (
-          <div className="pending-badge" id="pendingBadge" title={`${pendingCount} app${pendingCount > 1 ? 's' : ''} need review`}
-            onClick={() => {
-              const m = document.getElementById("reviewPendingModal");
-              if (m) m.style.display = "flex";
-            }}>
+          <div className="pending-badge" id="pendingBadge" title={`${pendingCount} app${pendingCount > 1 ? 's' : ''} need review`}>
             {pendingCount > 9 ? '9+' : pendingCount}
           </div>
         )}
@@ -731,6 +727,17 @@ export default function HomePage() {
           </div>
           <div className="user-menu-sep"></div>
           <button className="user-menu-item" id="openSettingsBtn" type="button"><i className="fas fa-cog"></i><span>Settings</span></button>
+          {pendingCount > 0 && (
+            <button className="user-menu-item" id="managePendingBtn" type="button"
+              onClick={() => {
+                document.getElementById("userMenu")?.classList.remove("show");
+                const m = document.getElementById("reviewPendingModal");
+                if (m) m.style.display = "flex";
+              }}>
+              <i className="fas fa-list-check"></i>
+              <span className="user-menu-item-label">Manage Uncategorized<br />Apps</span>
+            </button>
+          )}
           <button className="user-menu-item" id="unsplashConnectBtn" type="button"
             onClick={() => {
               document.getElementById("userMenu")?.classList.remove("show");

@@ -423,7 +423,8 @@
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto 1fr auto;
     gap: 20px;
-    height: calc(100dvh - 120px);
+    height: auto;
+    min-height: calc(100dvh - 120px);
     margin-bottom: 40px;
     align-items: start;
 }

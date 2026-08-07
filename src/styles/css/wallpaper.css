@@ -381,15 +381,16 @@ body.wallpaper-active .category-section {
   font-weight: 700;
   line-height: 18px;
   text-align: center;
-  cursor: pointer;
   box-shadow: 0 2px 6px rgba(233, 69, 96, 0.5);
-  transition: transform 0.2s ease;
   z-index: 1;
   user-select: none;
+  pointer-events: none;
 }
 
-.pending-badge:hover {
-  transform: scale(1.15);
+/* Two-line menu item label (keeps the menu at its natural width) */
+.user-menu-item .user-menu-item-label {
+  white-space: normal;
+  line-height: 1.25;
 }
 
 /* Dropdown menu */
