@@ -367,6 +367,12 @@ body.wallpaper-active .category-section {
   user-select: none;
 }
 
+.avatar-guest-icon {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+}
+
 .pending-badge {
   position: absolute;
   top: -4px;

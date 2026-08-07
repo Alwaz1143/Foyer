@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { migrateGuestData } from "@/lib/storage";
 
 interface AuthContextValue {
   user: User | null;
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) migrateGuestData(u.uid);
       setUser(u);
       setLoading(false);
     });

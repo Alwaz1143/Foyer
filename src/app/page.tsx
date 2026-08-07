@@ -714,6 +714,7 @@ export default function HomePage() {
         <button className="user-avatar-btn" id="userAvatarBtn" aria-label="Account menu" title="Account">
           <img id="userAvatarImg" alt="" className="avatar-photo" style={{ display: "none" }} />
           <span id="userAvatarInitials" className="avatar-initials"></span>
+          {!user && <i className="fas fa-user avatar-guest-icon"></i>}
         </button>
         {pendingCount > 0 && (
           <div className="pending-badge" id="pendingBadge" title={`${pendingCount} app${pendingCount > 1 ? 's' : ''} need review`}>
@@ -721,10 +722,17 @@ export default function HomePage() {
           </div>
         )}
         <div className="user-menu" id="userMenu">
-          <div className="user-menu-info">
-            <div className="user-menu-name" id="userMenuName"></div>
-            <div className="user-menu-email" id="userMenuEmail"></div>
-          </div>
+          {user ? (
+            <div className="user-menu-info">
+              <div className="user-menu-name" id="userMenuName"></div>
+              <div className="user-menu-email" id="userMenuEmail"></div>
+            </div>
+          ) : (
+            <div className="user-menu-info">
+              <div className="user-menu-name">Guest</div>
+              <div className="user-menu-email">Not signed in</div>
+            </div>
+          )}
           <div className="user-menu-sep"></div>
           <button className="user-menu-item" id="openSettingsBtn" type="button"><i className="fas fa-cog"></i><span>Settings</span></button>
           {pendingCount > 0 && (
@@ -738,20 +746,32 @@ export default function HomePage() {
               <span className="user-menu-item-label">Manage Uncategorized<br />Apps</span>
             </button>
           )}
-          <button className="user-menu-item" id="unsplashConnectBtn" type="button"
-            onClick={() => {
-              document.getElementById("userMenu")?.classList.remove("show");
-              if (!connected) startOAuth();
-            }}>
-            <i className={`fas ${connected ? "fa-check-circle" : "fa-camera-retro"}`}
-              style={connected ? { color: "#1db954" } : undefined}></i>
-            <span>{connected ? "Unsplash Connected" : "Connect Unsplash"}</span>
-          </button>
+          {user && (
+            <button className="user-menu-item" id="unsplashConnectBtn" type="button"
+              onClick={() => {
+                document.getElementById("userMenu")?.classList.remove("show");
+                if (!connected) startOAuth();
+              }}>
+              <i className={`fas ${connected ? "fa-check-circle" : "fa-camera-retro"}`}
+                style={connected ? { color: "#1db954" } : undefined}></i>
+              <span>{connected ? "Unsplash Connected" : "Connect Unsplash"}</span>
+            </button>
+          )}
           <a href="https://www.chai4.me/alwaz" target="_blank" rel="noopener noreferrer" className="user-menu-item" style={{ textDecoration: "none", color: "var(--text-color)" }}>
             <i className="fas fa-mug-hot" style={{ color: "#f59e0b" }}></i><span>Buy me a Chai</span>
           </a>
           <div className="user-menu-sep"></div>
-          <button className="user-menu-item danger" id="signOutBtn" type="button"><i className="fas fa-arrow-right-from-bracket"></i><span>Sign Out</span></button>
+          {user ? (
+            <button className="user-menu-item danger" id="signOutBtn" type="button"><i className="fas fa-arrow-right-from-bracket"></i><span>Sign Out</span></button>
+          ) : (
+            <button className="user-menu-item" id="guestSignInBtn" type="button"
+              onClick={() => {
+                document.getElementById("userMenu")?.classList.remove("show");
+                router.replace("/login");
+              }}>
+              <i className="fas fa-right-to-bracket"></i><span>Sign In</span>
+            </button>
+          )}
         </div>
       </div>
 

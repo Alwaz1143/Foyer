@@ -191,6 +191,11 @@ export default function LoginPage() {
               {loading && <i className="fas fa-circle-notch fa-spin"></i>}
             </button>
           </form>
+
+          <button type="button" className="guest-btn" onClick={() => router.replace("/")}>
+            <i className="fas fa-door-open"></i>
+            <span>Continue as Guest</span>
+          </button>
         </div>
         <p className="auth-footer">By signing in you agree to keep your Foyer account safe.</p>
       </div>

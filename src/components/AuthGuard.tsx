@@ -1,21 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, auth } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const router = useRouter();
 
   useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
+    if (loading || !user) return;
 
     // Ensure user doc exists (mirrors the original login behavior)
     const ensureUserDoc = async () => {
@@ -38,7 +32,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     // Populate avatar UI
     setupUserAvatar(user);
-  }, [user, loading, router]);
+  }, [user, loading]);
 
   return (
     <>
