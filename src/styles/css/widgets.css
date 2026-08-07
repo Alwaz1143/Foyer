@@ -709,6 +709,29 @@
     margin-top: 1px;
 }
 
+/* "Use my location" — shown only while on the fallback default location */
+.weather-locate {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    opacity: 0.8;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.weather-locate:hover {
+    opacity: 1;
+}
+
+.weather-locate i {
+    font-size: 11px;
+}
+
 /* Divider */
 .weather-divider {
     width: 60px;

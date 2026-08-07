@@ -50,7 +50,19 @@ export default function WeatherWidget() {
         <div className="weather-meta">
           {weather.humidity > 0 && <span>💧 {weather.humidity}%</span>}
           {weather.windSpeed > 0 && <span>💨 {weather.windSpeed} mph</span>}
-          {location && <><span className="weather-dot">·</span><span>{location.city}</span></>}
+          {location && (
+            <>
+              <span className="weather-dot">·</span>
+              {location.source === "default" ? (
+                <button className="weather-locate" onClick={retry} title="Use my location" aria-label="Use my location">
+                  <i className="fas fa-location-crosshair"></i>
+                  <span>{location.city}</span>
+                </button>
+              ) : (
+                <span>{location.city}</span>
+              )}
+            </>
+          )}
         </div>
       )}
 
