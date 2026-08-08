@@ -320,14 +320,10 @@ body.wallpaper-active .category-section {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
+  border: none;
   cursor: pointer;
   position: relative;
-  background: linear-gradient(
-    135deg,
-    var(--accent-primary, #667eea) 0%,
-    var(--accent-secondary, #764ba2) 100%
-  );
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -342,8 +338,12 @@ body.wallpaper-active .category-section {
 
 .user-avatar-btn:hover {
   transform: scale(1.08);
-  border-color: rgba(255, 255, 255, 0.7);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.user-avatar-btn:hover .avatar-photo,
+.user-avatar-btn:hover .avatar-initials {
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 .avatar-photo {
@@ -351,6 +351,8 @@ body.wallpaper-active .category-section {
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-sizing: border-box;
   display: block;
 }
 
@@ -363,6 +365,13 @@ body.wallpaper-active .category-section {
   justify-content: center;
   width: 100%;
   height: 100%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-sizing: border-box;
+  background: linear-gradient(
+    135deg,
+    var(--accent-primary, #667eea) 0%,
+    var(--accent-secondary, #764ba2) 100%
+  );
   font-family: "Inter", sans-serif;
   letter-spacing: 0;
   user-select: none;
