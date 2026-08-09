@@ -62,50 +62,41 @@ export default function MediaPlayer() {
 
   return (
     <div className="media-player" role="region" aria-label="Now playing">
-      <GlassBackdrop />
+      <div className="media-player-glass" aria-hidden="true">
+        <GlassBackdrop />
+      </div>
       <div className="media-player-surface">
-        <div className="media-player-head">
-          <button
-            className="media-player-art"
-            onClick={focusTab}
-            title="Open in tab"
-            aria-label="Open playing tab"
-          >
-            {state.artworkUrl ? (
-              <img src={state.artworkUrl} alt="" className="media-player-art-img" loading="lazy" />
-            ) : state.favIconUrl ? (
-              <img src={state.favIconUrl} alt="" className="media-player-art-favicon" loading="lazy" />
-            ) : (
-              <span className="media-player-art-fallback">
-                <i className="fa-solid fa-music"></i>
-              </span>
-            )}
-          </button>
-
-          <button className="media-player-info" onClick={focusTab} title="Open in tab">
-            <span
-              ref={titleRef}
-              className={`media-player-title${marquee ? " marquee" : ""}`}
-              title={marquee ? undefined : title}
-            >
-              {marquee ? (
-                <span className="media-player-title-track">{title}{title}</span>
-              ) : (
-                title
-              )}
+        <button
+          className="media-player-art"
+          onClick={focusTab}
+          title="Open in tab"
+          aria-label="Open playing tab"
+        >
+          {state.artworkUrl ? (
+            <img src={state.artworkUrl} alt="" className="media-player-art-img" loading="lazy" />
+          ) : state.favIconUrl ? (
+            <img src={state.favIconUrl} alt="" className="media-player-art-favicon" loading="lazy" />
+          ) : (
+            <span className="media-player-art-fallback">
+              <i className="fa-solid fa-music"></i>
             </span>
-            {subtitle && <span className="media-player-subtitle" title={subtitle}>{subtitle}</span>}
-          </button>
+          )}
+        </button>
 
-          <div className="media-player-source" title={state.tabTitle}>
-            {state.favIconUrl ? (
-              <img src={state.favIconUrl} alt="" className="media-player-favicon" loading="lazy" />
+        <button className="media-player-info" onClick={focusTab} title="Open in tab">
+          <span
+            ref={titleRef}
+            className={`media-player-title${marquee ? " marquee" : ""}`}
+            title={marquee ? undefined : title}
+          >
+            {marquee ? (
+              <span className="media-player-title-track">{title}{title}</span>
             ) : (
-              <i className="fa-solid fa-globe"></i>
+              title
             )}
-            <span>{state.sourceDomain || "Chrome tab"}</span>
-          </div>
-        </div>
+          </span>
+          {subtitle && <span className="media-player-subtitle" title={subtitle}>{subtitle}</span>}
+        </button>
 
         <div className="media-player-controls">
           <button
@@ -135,6 +126,15 @@ export default function MediaPlayer() {
           >
             <i className="fa-solid fa-forward-step"></i>
           </button>
+        </div>
+
+        <div className="media-player-source" title={state.tabTitle}>
+          {state.favIconUrl ? (
+            <img src={state.favIconUrl} alt="" className="media-player-favicon" loading="lazy" />
+          ) : (
+            <i className="fa-solid fa-globe"></i>
+          )}
+          <span>{state.sourceDomain || "Chrome tab"}</span>
         </div>
       </div>
     </div>

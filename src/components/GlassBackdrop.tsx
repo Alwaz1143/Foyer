@@ -3,14 +3,15 @@
 import { Component, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber";
-import { useFBO, MeshTransmissionMaterial } from "@react-three/drei";
+import { useFBO, MeshTransmissionMaterial, RoundedBox } from "@react-three/drei";
 import { easing } from "maath";
 
 /**
  * Fluid glass backdrop for the mini media player, adapted from React Bits'
- * "Fluid Glass". A lens-shaped glass mesh with MeshTransmissionMaterial
- * refracts an FBO of an abstract gradient, damped toward the pointer. Renders
- * nothing when WebGL is unavailable (the CSS glass pill remains the fallback).
+ * "Fluid Glass" (bar mode). A rounded glass slab anchored to the bottom of the
+ * pill refracts an FBO of an abstract gradient; it sways horizontally toward
+ * the cursor. Renders nothing when WebGL is unavailable (the CSS glass pill
+ * remains the fallback).
  */
 
 function createBackdropTexture(): THREE.CanvasTexture {
@@ -47,7 +48,7 @@ function createBackdropTexture(): THREE.CanvasTexture {
 }
 
 function GlassScene({ reduced }: { reduced: boolean }) {
-  const lens = useRef<THREE.Mesh>(null);
+  const bar = useRef<THREE.Mesh>(null);
   const buffer = useFBO();
   const { gl, viewport } = useThree();
   const texture = useMemo(createBackdropTexture, []);
@@ -69,23 +70,17 @@ function GlassScene({ reduced }: { reduced: boolean }) {
   }, [gl, pointer]);
 
   useFrame((state, delta) => {
-    const mesh = lens.current;
+    const mesh = bar.current;
     if (!mesh) return;
     const v = state.viewport.getCurrentViewport(state.camera, [0, 0, 12]);
 
-    if (reduced) {
-      mesh.position.set(0, 0, 12);
-      mesh.scale.setScalar(v.height * 0.45);
-      return;
-    }
+    const w = v.width * 0.95;
+    const h = v.height * 0.6;
+    mesh.scale.set(w / 3.2, h / 0.4, 1);
 
-    easing.damp3(
-      mesh.position,
-      [(pointer.x * v.width) / 2, pointer.y * v.height * 0.15, 12],
-      0.18,
-      delta
-    );
-    mesh.scale.setScalar(v.height * 0.45);
+    const anchorY = -v.height / 2 + h / 2 + v.height * 0.03;
+    const destX = reduced ? 0 : pointer.x * v.width * 0.14;
+    easing.damp3(mesh.position, [destX, anchorY, 12], 0.35, delta);
 
     gl.setRenderTarget(buffer);
     gl.render(backScene, state.camera);
@@ -97,7 +92,7 @@ function GlassScene({ reduced }: { reduced: boolean }) {
       {createPortal(
         <mesh position={[0, 0, 11]}>
           <planeGeometry args={[viewport.width, viewport.height, 1]} />
-          <meshBasicMaterial map={texture} toneMapped={false} />
+          <meshBasicMaterial map={texture} transparent opacity={0.45} toneMapped={false} />
         </mesh>,
         backScene
       )}
@@ -105,16 +100,26 @@ function GlassScene({ reduced }: { reduced: boolean }) {
         <planeGeometry />
         <meshBasicMaterial map={buffer.texture} transparent />
       </mesh>
-      <mesh ref={lens} position={[0, 0, 12]}>
-        <sphereGeometry args={[1, 64, 64]} />
+      <RoundedBox
+        ref={bar}
+        args={[3.2, 0.4, 0.8]}
+        radius={0.16}
+        smoothness={6}
+        position={[0, 0, 12]}
+      >
         <MeshTransmissionMaterial
           buffer={buffer.texture}
-          ior={1.2}
-          thickness={3}
-          anisotropy={0.01}
-          chromaticAberration={0.15}
+          transmission={1}
+          roughness={0}
+          thickness={10}
+          ior={1.15}
+          chromaticAberration={0.12}
+          anisotropy={0.08}
+          color="#ffffff"
+          attenuationColor="#ffffff"
+          attenuationDistance={6}
         />
-      </mesh>
+      </RoundedBox>
     </>
   );
 }
