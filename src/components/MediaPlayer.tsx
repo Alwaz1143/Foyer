@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useMediaPlayer } from "@/hooks/useMediaPlayer";
+
+// Lazy WebGL backdrop (three.js bundle) — only downloaded when the player shows.
+const GlassBackdrop = dynamic(() => import("@/components/GlassBackdrop"), {
+  ssr: false,
+  loading: () => null,
+});
 
 /**
  * Mini media player shown only when media is playing (or paused) in another
@@ -55,75 +62,80 @@ export default function MediaPlayer() {
 
   return (
     <div className="media-player" role="region" aria-label="Now playing">
-      <button
-        className="media-player-art"
-        onClick={focusTab}
-        title="Open in tab"
-        aria-label="Open playing tab"
-      >
-        {state.artworkUrl ? (
-          <img src={state.artworkUrl} alt="" className="media-player-art-img" loading="lazy" />
-        ) : state.favIconUrl ? (
-          <img src={state.favIconUrl} alt="" className="media-player-art-favicon" loading="lazy" />
-        ) : (
-          <span className="media-player-art-fallback">
-            <i className="fa-solid fa-music"></i>
-          </span>
-        )}
-      </button>
+      <GlassBackdrop />
+      <div className="media-player-surface">
+        <div className="media-player-head">
+          <button
+            className="media-player-art"
+            onClick={focusTab}
+            title="Open in tab"
+            aria-label="Open playing tab"
+          >
+            {state.artworkUrl ? (
+              <img src={state.artworkUrl} alt="" className="media-player-art-img" loading="lazy" />
+            ) : state.favIconUrl ? (
+              <img src={state.favIconUrl} alt="" className="media-player-art-favicon" loading="lazy" />
+            ) : (
+              <span className="media-player-art-fallback">
+                <i className="fa-solid fa-music"></i>
+              </span>
+            )}
+          </button>
 
-      <button className="media-player-info" onClick={focusTab} title="Open in tab">
-        <span
-          ref={titleRef}
-          className={`media-player-title${marquee ? " marquee" : ""}`}
-          title={marquee ? undefined : title}
-        >
-          {marquee ? (
-            <span className="media-player-title-track">{title}{title}</span>
-          ) : (
-            title
-          )}
-        </span>
-        {subtitle && <span className="media-player-subtitle" title={subtitle}>{subtitle}</span>}
-      </button>
+          <button className="media-player-info" onClick={focusTab} title="Open in tab">
+            <span
+              ref={titleRef}
+              className={`media-player-title${marquee ? " marquee" : ""}`}
+              title={marquee ? undefined : title}
+            >
+              {marquee ? (
+                <span className="media-player-title-track">{title}{title}</span>
+              ) : (
+                title
+              )}
+            </span>
+            {subtitle && <span className="media-player-subtitle" title={subtitle}>{subtitle}</span>}
+          </button>
 
-      <div className="media-player-controls">
-        <button
-          className="media-player-btn"
-          onClick={prev}
-          disabled={!controlsAvailable || !state.canPrev}
-          title="Previous track"
-          aria-label="Previous track"
-        >
-          <i className="fa-solid fa-backward-step"></i>
-        </button>
-        <button
-          className="media-player-btn media-player-play"
-          onClick={onPlayPause}
-          disabled={!controlsAvailable}
-          title={playing ? "Pause" : "Play"}
-          aria-label={playing ? "Pause" : "Play"}
-        >
-          <i className={`fa-solid ${playing ? "fa-pause" : "fa-play"}`}></i>
-        </button>
-        <button
-          className="media-player-btn"
-          onClick={next}
-          disabled={!controlsAvailable || !state.canNext}
-          title="Next track"
-          aria-label="Next track"
-        >
-          <i className="fa-solid fa-forward-step"></i>
-        </button>
-      </div>
+          <div className="media-player-source" title={state.tabTitle}>
+            {state.favIconUrl ? (
+              <img src={state.favIconUrl} alt="" className="media-player-favicon" loading="lazy" />
+            ) : (
+              <i className="fa-solid fa-globe"></i>
+            )}
+            <span>{state.sourceDomain || "Chrome tab"}</span>
+          </div>
+        </div>
 
-      <div className="media-player-source" title={state.tabTitle}>
-        {state.favIconUrl ? (
-          <img src={state.favIconUrl} alt="" className="media-player-favicon" loading="lazy" />
-        ) : (
-          <i className="fa-solid fa-globe"></i>
-        )}
-        <span>{state.sourceDomain || "Chrome tab"}</span>
+        <div className="media-player-controls">
+          <button
+            className="media-player-btn"
+            onClick={prev}
+            disabled={!controlsAvailable || !state.canPrev}
+            title="Previous track"
+            aria-label="Previous track"
+          >
+            <i className="fa-solid fa-backward-step"></i>
+          </button>
+          <button
+            className="media-player-btn media-player-play"
+            onClick={onPlayPause}
+            disabled={!controlsAvailable}
+            title={playing ? "Pause" : "Play"}
+            aria-label={playing ? "Pause" : "Play"}
+          >
+            <i className={`fa-solid ${playing ? "fa-pause" : "fa-play"}`}></i>
+          </button>
+          <button
+            className="media-player-btn"
+            onClick={next}
+            disabled={!controlsAvailable || !state.canNext}
+            title="Next track"
+            aria-label="Next track"
+          >
+            <i className="fa-solid fa-forward-step"></i>
+          </button>
+        </div>
       </div>
     </div>
   );
