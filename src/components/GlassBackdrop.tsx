@@ -2,15 +2,14 @@
 
 import { Component, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber";
-import { useFBO, MeshTransmissionMaterial, RoundedBox } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { easing } from "maath";
 
 /**
- * Fluid glass backdrop for the mini media player, adapted from React Bits'
- * "Fluid Glass" (bar mode). A rounded glass slab anchored to the bottom of the
- * pill refracts an FBO of an abstract gradient; it sways horizontally toward
- * the cursor. Renders nothing when WebGL is unavailable (the CSS glass pill
+ * Fluid glass backdrop for the mini media player. The whole pill acts as one
+ * glass capsule (native three.js transmission — no custom shaders) refracting
+ * an abstract gradient plane behind it, with a slow cursor sway and a gentle
+ * idle bob. Renders nothing when WebGL is unavailable (the CSS glass pill
  * remains the fallback).
  */
 
@@ -48,11 +47,9 @@ function createBackdropTexture(): THREE.CanvasTexture {
 }
 
 function GlassScene({ reduced }: { reduced: boolean }) {
-  const bar = useRef<THREE.Mesh>(null);
-  const buffer = useFBO();
-  const { gl, viewport } = useThree();
+  const lens = useRef<THREE.Mesh>(null);
+  const { viewport, gl } = useThree();
   const texture = useMemo(createBackdropTexture, []);
-  const [backScene] = useState(() => new THREE.Scene());
   const pointer = useMemo(() => new THREE.Vector2(0, 0), []);
 
   useEffect(() => {
@@ -70,56 +67,38 @@ function GlassScene({ reduced }: { reduced: boolean }) {
   }, [gl, pointer]);
 
   useFrame((state, delta) => {
-    const mesh = bar.current;
+    const mesh = lens.current;
     if (!mesh) return;
     const v = state.viewport.getCurrentViewport(state.camera, [0, 0, 12]);
 
-    const w = v.width * 0.95;
-    const h = v.height * 0.6;
-    mesh.scale.set(w / 3.2, h / 0.4, 1);
+    // Pill lens: capsule(radius 1, length 6) -> width 8, height 2
+    mesh.scale.set(v.width / 8, v.height / 2, 0.5);
 
-    const anchorY = -v.height / 2 + h / 2 + v.height * 0.03;
-    const destX = reduced ? 0 : pointer.x * v.width * 0.14;
-    easing.damp3(mesh.position, [destX, anchorY, 12], 0.35, delta);
-
-    gl.setRenderTarget(buffer);
-    gl.render(backScene, state.camera);
-    gl.setRenderTarget(null);
+    const t = state.clock.elapsedTime;
+    const swayX = reduced ? 0 : pointer.x * v.width * 0.03;
+    const bobY = reduced ? 0 : Math.sin(t * 1.4) * v.height * 0.015;
+    easing.damp3(mesh.position, [swayX, bobY, 11.6], 0.25, delta);
   });
 
   return (
     <>
-      {createPortal(
-        <mesh position={[0, 0, 11]}>
-          <planeGeometry args={[viewport.width, viewport.height, 1]} />
-          <meshBasicMaterial map={texture} transparent opacity={0.45} toneMapped={false} />
-        </mesh>,
-        backScene
-      )}
-      <mesh scale={[viewport.width, viewport.height, 1]}>
-        <planeGeometry />
-        <meshBasicMaterial map={buffer.texture} transparent />
+      <mesh position={[0, 0, 0]}>
+        <planeGeometry args={[viewport.width * 1.5, viewport.height * 1.5, 1]} />
+        <meshBasicMaterial map={texture} transparent opacity={0.85} toneMapped={false} />
       </mesh>
-      <RoundedBox
-        ref={bar}
-        args={[3.2, 0.4, 0.8]}
-        radius={0.16}
-        smoothness={6}
-        position={[0, 0, 12]}
-      >
-        <MeshTransmissionMaterial
-          buffer={buffer.texture}
+      <mesh ref={lens} position={[0, 0, 11.6]} rotation-z={Math.PI / 2}>
+        <capsuleGeometry args={[1, 6, 8, 32]} />
+        <meshPhysicalMaterial
           transmission={1}
-          roughness={0}
-          thickness={10}
-          ior={1.15}
-          chromaticAberration={0.12}
-          anisotropy={0.08}
-          color="#ffffff"
-          attenuationColor="#ffffff"
-          attenuationDistance={6}
+          roughness={0.05}
+          thickness={2}
+          ior={1.2}
+          attenuationColor="#8fa8ff"
+          attenuationDistance={2}
+          transparent
+          side={THREE.DoubleSide}
         />
-      </RoundedBox>
+      </mesh>
     </>
   );
 }
@@ -165,6 +144,11 @@ export default function GlassBackdrop() {
         camera={{ position: [0, 0, 12], fov: 15 }}
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
         frameloop={reduced ? "demand" : "always"}
+        onCreated={({ gl }) => {
+          gl.debug.onShaderError = (_gl, _program, vs, fs) => {
+            console.warn("[foyer] GL shader error — vertex:", vs, "fragment:", fs);
+          };
+        }}
       >
         <GlassScene reduced={reduced} />
       </Canvas>
