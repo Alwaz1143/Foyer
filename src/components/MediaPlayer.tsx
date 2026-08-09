@@ -1,14 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { useMediaPlayer } from "@/hooks/useMediaPlayer";
-
-// Lazy WebGL backdrop (three.js bundle) — only downloaded when the player shows.
-const GlassBackdrop = dynamic(() => import("@/components/GlassBackdrop"), {
-  ssr: false,
-  loading: () => null,
-});
 
 /**
  * Mini media player shown only when media is playing (or paused) in another
@@ -62,9 +55,7 @@ export default function MediaPlayer() {
 
   return (
     <div className="media-player" role="region" aria-label="Now playing">
-      <div className="media-player-glass" aria-hidden="true">
-        <GlassBackdrop />
-      </div>
+      <div className="media-player-sheen" aria-hidden="true"></div>
       <div className="media-player-surface">
         <button
           className="media-player-art"

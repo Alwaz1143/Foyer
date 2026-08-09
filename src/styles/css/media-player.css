@@ -1,9 +1,11 @@
 /* ============================================
-   Media Player (mini player) — Fluid Pill
-   Compact pill over the fluid-glass WebGL
-   backdrop (GlassBackdrop.tsx, bar mode).
-   Shown bottom-center only while media is
-   playing or paused in another Chrome tab.
+   Media Player (mini player) — Liquid Glass
+   Compact pill that refracts the REAL page
+   behind it (backdrop-filter blurs/saturates
+   the live DOM — it shimmers while you scroll),
+   with a radial lens highlight and an animated
+   light sweep. Shown bottom-center only while
+   media is playing or paused in another tab.
    ============================================ */
 
 .media-player {
@@ -19,39 +21,93 @@
   gap: 10px;
   padding: 8px 12px 8px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.1) 0%,
-    rgba(255, 255, 255, 0.03) 55%,
-    rgba(255, 255, 255, 0.07) 100%
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.04) 55%,
+    rgba(255, 255, 255, 0.09) 100%
   );
-  backdrop-filter: blur(14px) saturate(150%) brightness(1.02);
-  -webkit-backdrop-filter: blur(14px) saturate(150%) brightness(1.02);
+  backdrop-filter: blur(14px) saturate(180%) brightness(1.06);
+  -webkit-backdrop-filter: blur(14px) saturate(180%) brightness(1.06);
   box-shadow:
     0 18px 40px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.06),
+    inset 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset -1px 0 0 rgba(255, 255, 255, 0.08);
   animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   max-width: min(92vw, 520px);
 }
 
-/* Sized shell for the WebGL backdrop — the R3F wrapper measures this box,
-   so the fluid plane always fills the pill exactly. */
-.media-player-glass {
+/* Lens — brightens/saturates the live content at the pill's center (stretch),
+   fades toward the edges (squeeze); light, blur-free sampling. */
+.media-player::after {
+  content: "";
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  z-index: 1;
   border-radius: inherit;
+  transform: scale(1.4);
+  transform-origin: center;
+  backdrop-filter: saturate(1.6) brightness(1.1);
+  -webkit-backdrop-filter: saturate(1.6) brightness(1.1);
+  -webkit-mask:
+    radial-gradient(ellipse 100% 100% at center, rgba(0, 0, 0, 0.95) 25%, transparent 80%),
+    linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.2) 30%, transparent 60%, transparent 100%);
+  mask:
+    radial-gradient(ellipse 100% 100% at center, rgba(0, 0, 0, 0.95) 25%, transparent 80%),
+    linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.2) 30%, transparent 60%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
   pointer-events: none;
-  z-index: 0;
 }
 
-.media-player-glass canvas {
+/* Animated light sweep gliding across the pill */
+.media-player-sheen {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: hidden;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 255, 255, 0.14) 45%,
+    rgba(255, 255, 255, 0.05) 55%,
+    transparent 70%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: glassSheen 7s ease-in-out infinite;
+}
+
+@keyframes glassSheen {
+  0% { transform: translateX(-100%); }
+  45% { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-player-sheen {
+    animation: none;
+    transform: translateX(100%);
+    opacity: 0.4;
+  }
+}
+
+/* Opaque fallback where backdrop-filter is unsupported */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .media-player {
+    background: rgba(24, 26, 45, 0.96);
+  }
+
+  .media-player::after,
+  .media-player-sheen {
+    display: none;
+  }
 }
 
 /* Content surface — always above the canvas */
