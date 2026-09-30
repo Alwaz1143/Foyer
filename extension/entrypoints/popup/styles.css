@@ -324,3 +324,72 @@ body {
 .btn-secondary:hover:not(:disabled) {
   background: #3a3a5a;
 }
+
+/* ── Section dropdown & create section ──────────────────────────────── */
+
+.section-select-group {
+  margin-bottom: 12px;
+}
+
+.section-select-label {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.section-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.section-select:focus {
+  border-color: #e94560;
+}
+
+.section-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.new-section-input-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #2a2a4a;
+}
+
+.new-section-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+}
+
+.new-section-input:focus {
+  border-color: #e94560;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-sm {
+  padding: 8px 12px;
+  font-size: 12px;
+}

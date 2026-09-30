@@ -37,6 +37,10 @@ export default function App() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
+  const [showNewSection, setShowNewSection] = useState(false);
+  const [newSectionName, setNewSectionName] = useState("");
+  const [alreadyAdded, setAlreadyAdded] = useState<{ exists: boolean; categoryName?: string; categoryId?: string }>({ exists: false });
+
   useEffect(() => {
     (async () => {
       const res = await chrome.runtime.sendMessage({ type: "GET_AUTH_STATUS" });
@@ -61,6 +65,14 @@ export default function App() {
           if (tab?.url && tab?.title) {
             setTabInfo({ title: tab.title, url: tab.url });
           }
+
+          // Check if current tab URL already exists in any category
+          const checkRes = await chrome.runtime.sendMessage({ type: "CHECK_URL_EXISTS" });
+          setAlreadyAdded({ exists: checkRes.exists, categoryName: checkRes.categoryName, categoryId: checkRes.categoryId });
+          if (checkRes.exists && checkRes.categoryId) {
+            setSelectedCategoryId(checkRes.categoryId);
+          }
+
           setState("ready");
         }
       } else {
@@ -69,6 +81,16 @@ export default function App() {
       }
     })();
   }, []);
+
+  // Toggle new section input when "__CREATE_NEW__" is selected
+  useEffect(() => {
+    if (selectedCategoryId === "__CREATE_NEW__") {
+      setShowNewSection(true);
+      setSelectedCategoryId("");
+    } else {
+      setShowNewSection(false);
+    }
+  }, [selectedCategoryId]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +170,42 @@ export default function App() {
     } else {
       setState("error");
       setMessage("Sync failed. Try again.");
+    }
+  };
+
+  const handleCreateSection = async () => {
+    if (!newSectionName.trim()) return;
+    const res = await chrome.runtime.sendMessage({ type: "CREATE_CATEGORY", name: newSectionName, icon: "📁" });
+    if (res.success) {
+      const newCat = res.category;
+      setCategories(prev => [...prev, { id: newCat.id, name: newCat.name }]);
+      setSelectedCategoryId(newCat.id);
+      setShowNewSection(false);
+      setNewSectionName("");
+    } else {
+      setMessage("Failed to create section");
+    }
+  };
+
+  const handleAddToSection = async () => {
+    if (!selectedCategoryId || selectedCategoryId === "__CREATE_NEW__") return;
+    setState("adding");
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    const res = await chrome.runtime.sendMessage({
+      type: "ADD_TO_SPECIFIC_SECTION",
+      categoryId: selectedCategoryId,
+      title: tab?.title,
+      url: tab?.url
+    });
+    if (res.success) {
+      setState("added");
+      setMessage(res.categoryName ? `Added to ${res.categoryName}` : "Added!");
+      setAlreadyAdded({ exists: true, categoryName: res.categoryName, categoryId: selectedCategoryId });
+    } else {
+      setState("error");
+      setMessage(res.error === "already_exists" ? `Already in ${res.categoryName}` : "Failed to add");
+      if (res.categoryName) setAlreadyAdded({ exists: true, categoryName: res.categoryName });
     }
   };
 
@@ -422,29 +480,93 @@ export default function App() {
         </div>
       )}
 
-      <button className="btn btn-primary btn-block" onClick={handleAddPage} disabled={state === "adding"}>
-        {state === "adding" ? (
-          <><i className="fas fa-spinner fa-spin"></i> Adding...</>
-        ) : (
-          <><i className="fas fa-plus"></i> Add to Foyer</>
+      {/* Section dropdown */}
+      <div className="section-select-group">
+        <label className="section-select-label">Add to Section:</label>
+        <select
+          className="section-select"
+          value={selectedCategoryId}
+          onChange={(e) => setSelectedCategoryId(e.target.value)}
+          disabled={alreadyAdded.exists}
+        >
+          <option value="">Select a section...</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id} disabled={alreadyAdded.exists && cat.id !== alreadyAdded.categoryId}>
+              {cat.name} {alreadyAdded.exists && cat.id === alreadyAdded.categoryId ? " ✓ Already added" : ""}
+            </option>
+          ))}
+          <option value="__CREATE_NEW__">➕ Create new section...</option>
+        </select>
+      </div>
+
+      {/* New section inline input */}
+      {showNewSection && (
+        <div className="new-section-input-group">
+          <input
+            className="new-section-input"
+            placeholder="Section name..."
+            value={newSectionName}
+            onChange={(e) => setNewSectionName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreateSection()}
+            autoFocus
+          />
+          <button className="btn btn-primary btn-sm" onClick={handleCreateSection} disabled={!newSectionName.trim()}>
+            Create
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => { setShowNewSection(false); setNewSectionName(""); }}>
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div className="action-buttons">
+        <button
+          className="btn btn-primary btn-block"
+          onClick={handleAddToSection}
+          disabled={!selectedCategoryId || selectedCategoryId === "__CREATE_NEW__" || state === "adding" || alreadyAdded.exists}
+        >
+          {state === "adding" ? (
+            <><i className="fas fa-spinner fa-spin"></i> Adding...</>
+          ) : (
+            <>Add to {categories.find(c => c.id === selectedCategoryId)?.name || "Section"}</>
+          )}
+        </button>
+        <button
+          className="btn btn-secondary btn-block"
+          onClick={handleAddPage}
+          disabled={state === "adding" || alreadyAdded.exists}
+        >
+          <i className="fas fa-magic"></i> Add to Foyer (Auto)
+        </button>
+
+        {alreadyAdded.exists && (
+          <div className="status-bar status-success">
+            <i className="fas fa-check"></i> Already in <strong>{alreadyAdded.categoryName}</strong>
+          </div>
         )}
-      </button>
 
-      {state === "syncing" && (
-        <div className="status-bar"><i className="fas fa-sync fa-spin"></i> Syncing bookmarks...</div>
-      )}
+        {state === "syncing" && (
+          <div className="status-bar"><i className="fas fa-sync fa-spin"></i> Syncing bookmarks...</div>
+        )}
 
-      {state === "synced" && (
-        <div className="status-bar status-success"><i className="fas fa-check"></i> {message}</div>
-      )}
+        {state === "synced" && (
+          <div className="status-bar status-success"><i className="fas fa-check"></i> {message}</div>
+        )}
 
-      {state === "added" && (
-        <div className="status-bar status-success"><i className="fas fa-check"></i> {message}</div>
-      )}
+        {state === "added" && (
+          <div className="status-bar status-success">
+            <i className="fas fa-check"></i> {message}
+            <a href="https://foyer.alwaz.tech" target="_blank" rel="noopener noreferrer" style={{ marginLeft: "8px", color: "#4fc3f7", textDecoration: "underline", fontSize: "12px" }}>
+              View Dashboard →
+            </a>
+          </div>
+        )}
 
-      {state === "error" && (
-        <div className="status-bar status-error"><i className="fas fa-exclamation-circle"></i> {message}</div>
-      )}
+        {state === "error" && (
+          <div className="status-bar status-error"><i className="fas fa-exclamation-circle"></i> {message}</div>
+        )}
+      </div>
     </div>
   );
 }

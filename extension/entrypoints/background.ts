@@ -1,6 +1,6 @@
 import { defineBackground } from "wxt/sandbox";
 import { onUserChanged } from "../lib/auth";
-import { getCategories, addSiteToCategory, addPendingBookmark, getPendingBookmarks, removePendingBookmark, clearAllPending } from "../lib/firestore";
+import { getCategories, addSiteToCategory, addPendingBookmark, getPendingBookmarks, removePendingBookmark, clearAllPending, addCategoryToFirestore } from "../lib/firestore";
 import { classifySite } from "../shared/classifySite";
 import type { ClassificationResult } from "../shared/classifySite";
 import { normalizeUrl } from "../shared/normalizeUrl";
@@ -828,6 +828,81 @@ case "SPOTIFY_STATE": {
         await setBadgeToPendingCount();
         sendResponse({ success: true });
       })().catch((err) => { console.error("Foyer: CLEAR_PENDING_BOOKMARKS handler error:", err); sendResponse({ success: false, error: err.message }); });
+      return true;
+    }
+
+    case "CHECK_URL_EXISTS": {
+      (async () => {
+        if (!currentUser) { sendResponse({ exists: false }); return; }
+        await refreshCategories();
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs[0];
+        if (!tab?.url) { sendResponse({ exists: false }); return; }
+        const normalizedUrl = normalizeUrl(tab.url);
+        for (const cat of cachedCategories) {
+          for (const site of cat.websites) {
+            if (normalizeUrl(site.url) === normalizedUrl) {
+              sendResponse({ exists: true, categoryName: cat.name, categoryId: cat.id });
+              return;
+            }
+          }
+        }
+        sendResponse({ exists: false });
+      })();
+      return true;
+    }
+
+    case "ADD_TO_SPECIFIC_SECTION": {
+      (async () => {
+        if (!currentUser) { sendResponse({ success: false, error: "not_signed_in" }); return; }
+        const { categoryId, title, url } = message;
+        await refreshCategories();
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs[0];
+        const finalTitle = title || tab?.title;
+        const finalUrl = url || tab?.url;
+        if (!finalUrl || !finalTitle) { sendResponse({ success: false, error: "no_tab" }); return; }
+
+        const normalizedUrl = normalizeUrl(finalUrl);
+        for (const cat of cachedCategories) {
+          for (const site of cat.websites) {
+            if (normalizeUrl(site.url) === normalizedUrl) {
+              sendResponse({ success: false, error: "already_exists", categoryName: cat.name });
+              return;
+            }
+          }
+        }
+
+        const domain = getRootDomain(finalUrl);
+        const site: Website = { id: generateSiteId(), name: finalTitle, url: finalUrl, domain };
+        try {
+          await addSiteToCategory(currentUser.uid, categoryId, site);
+          await refreshCategories();
+          const categoryName = cachedCategories.find(c => c.id === categoryId)?.name;
+          sendResponse({ success: true, categoryName });
+        } catch {
+          sendResponse({ success: false, error: "write_failed" });
+        }
+      })();
+      return true;
+    }
+
+    case "CREATE_CATEGORY": {
+      (async () => {
+        if (!currentUser) { sendResponse({ success: false, error: "not_signed_in" }); return; }
+        const { name, icon } = message;
+        if (!name?.trim()) { sendResponse({ success: false, error: "empty_name" }); return; }
+        const existingIds = new Set(cachedCategories.map(c => c.id));
+        const newId = generateCategoryId(name.trim(), existingIds);
+        const newCat: Category = { id: newId, name: name.trim(), icon: icon || "📁", websites: [] };
+        try {
+          await addCategoryToFirestore(currentUser.uid, newCat);
+          await refreshCategories();
+          sendResponse({ success: true, category: { id: newId, name: name.trim(), icon: icon || "📁" } });
+        } catch {
+          sendResponse({ success: false, error: "write_failed" });
+        }
+      })();
       return true;
     }
   }

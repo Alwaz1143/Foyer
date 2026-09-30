@@ -139,3 +139,8 @@ export async function clearAllPending(uid: string): Promise<void> {
   }
   await batch.commit();
 }
+
+export async function addCategoryToFirestore(uid: string, category: Category): Promise<void> {
+  const catRef = doc(fsCollection(db, "users", uid, "categories"), category.id);
+  await setDoc(catRef, { name: category.name, icon: category.icon, orderIndex: Date.now() });
+}
