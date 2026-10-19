@@ -9,25 +9,31 @@ export interface ClassificationResult {
   matchedBy: "domain" | "folder" | "keyword" | "none";
 }
 
-function getCategoryNames(categories: Category[]): string[] {
-  return categories.map((c) => c.name.toLowerCase().trim());
+const ICON_REGEX = /^[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]+\s*/u;
+
+function stripIcon(name: string): string {
+  return name.replace(ICON_REGEX, "").trim();
+}
+
+function normalizeForMatch(name: string): string {
+  return stripIcon(name).toLowerCase().trim();
 }
 
 function matchCategoryByName(
   search: string,
   categories: Category[]
 ): Category | null {
-  const lower = search.toLowerCase().trim();
-  if (lower.length < 3) return null;
-  const searchWords = lower.split(/[\s\-_/]+/).filter(Boolean);
+  const normalizedSearch = normalizeForMatch(search);
+  if (!normalizedSearch) return null;
+
   for (const cat of categories) {
-    const name = cat.name.toLowerCase().trim();
-    const nameWords = name.split(/[\s\-_/]+/);
-    if (searchWords.some((sw) => nameWords.some((nw) => nw === sw))) return cat;
-    if (lower.length >= 4 && nameWords.some((nw) => nw.includes(lower))) return cat;
-    const noIcon = name.replace(/[^\w\s-]/g, "").trim();
-    const noIconWords = noIcon.split(/[\s\-_/]+/);
-    if (searchWords.some((sw) => noIconWords.some((nw) => nw === sw))) return cat;
+    const normalizedName = normalizeForMatch(cat.name);
+    if (!normalizedName) continue;
+    
+    // Bidirectional substring match (case-insensitive)
+    if (normalizedName.includes(normalizedSearch) || normalizedSearch.includes(normalizedName)) {
+      return cat;
+    }
   }
   return null;
 }

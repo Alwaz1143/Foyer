@@ -1,6 +1,6 @@
 import { defineBackground } from "wxt/sandbox";
 import { onUserChanged } from "../lib/auth";
-import { getCategories, addSiteToCategory, addPendingBookmark, getPendingBookmarks, removePendingBookmark, clearAllPending, addCategoryToFirestore } from "../lib/firestore";
+import { getCategories, addSiteToCategory, addPendingBookmark, getPendingBookmarks, removePendingBookmark, clearAllPending, addCategoryToFirestore, ensureUncategorizedCategory } from "../lib/firestore";
 import { classifySite } from "../shared/classifySite";
 import type { ClassificationResult } from "../shared/classifySite";
 import { normalizeUrl } from "../shared/normalizeUrl";
@@ -94,25 +94,32 @@ async function addBookmarkToFoyer(
   for (const cat of cachedCategories) {
     for (const site of cat.websites) {
       if (normalizeUrl(site.url) === normalizedUrl) {
-        return { added: false, alreadyExists: true, classification };
+        return { added: false, alreadyExists: true, categoryName: cat.name, classification };
       }
     }
   }
 
-  if (!classification.categoryId) {
-    return { added: false, alreadyExists: false, classification };
+  let categoryId = classification.categoryId;
+  let categoryName = classification.suggestedCategoryName;
+
+  // If no category matched, auto-create/find "Uncategorized" section
+  if (!categoryId) {
+    categoryId = await ensureUncategorizedCategory(currentUser.uid);
+    categoryName = "Uncategorized";
+    // Refresh categories to include the new Uncategorized section
+    await refreshCategories();
   }
 
   const domain = getRootDomain(url);
   const site: Website = { id: generateSiteId(), name: title, url, domain };
 
   try {
-    await addSiteToCategory(currentUser.uid, classification.categoryId, site);
+    await addSiteToCategory(currentUser.uid, categoryId, site);
     await refreshCategories();
     return {
       added: true,
       alreadyExists: false,
-      categoryName: cachedCategories.find(c => c.id === classification.categoryId)?.name,
+      categoryName,
       classification,
     };
   } catch {
@@ -653,7 +660,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const tab = tabs[0];
         if (!tab?.url || !tab?.title) { sendResponse({ success: false, error: "no_tab" }); return; }
 
-        const result = await addBookmarkToFoyer(tab.title, tab.url);
+        // Get folder hint from Chrome bookmarks
+        let folderHint: string | undefined;
+        try {
+          const results = await chrome.bookmarks.search({ url: tab.url });
+          if (results.length > 0) {
+            const bookmark = results[0];
+            if (bookmark.parentId) {
+              const parent = await chrome.bookmarks.get(bookmark.parentId);
+              if (parent[0] && !parent[0].url) {
+                folderHint = parent[0].title;
+              }
+            }
+          }
+        } catch { /* ignore */ }
+
+        const result = await addBookmarkToFoyer(tab.title, tab.url, folderHint);
         sendResponse({ success: true, added: result.added, categoryName: result.categoryName });
       })().catch((err) => { console.error("Foyer: ADD_CURRENT_PAGE handler error:", err); sendResponse({ success: false, error: err.message }); });
       return true;
@@ -883,6 +905,33 @@ case "SPOTIFY_STATE": {
         } catch {
           sendResponse({ success: false, error: "write_failed" });
         }
+      })();
+      return true;
+    }
+
+    case "FIND_BOOKMARK_FOLDER": {
+      (async () => {
+        if (!currentUser) { sendResponse({ folderHint: null }); return; }
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs[0];
+        if (!tab?.url) { sendResponse({ folderHint: null }); return; }
+
+        try {
+          const results = await chrome.bookmarks.search({ url: tab.url });
+          if (results.length > 0) {
+            const bookmark = results[0];
+            if (bookmark.parentId) {
+              const parent = await chrome.bookmarks.get(bookmark.parentId);
+              if (parent[0] && !parent[0].url) {
+                // Strip icons from folder name
+                const folderName = parent[0].title.replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]+\s*/u, "").trim();
+                sendResponse({ folderHint: folderName });
+                return;
+              }
+            }
+          }
+        } catch { /* ignore */ }
+        sendResponse({ folderHint: null });
       })();
       return true;
     }

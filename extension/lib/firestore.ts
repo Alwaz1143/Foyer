@@ -140,6 +140,21 @@ export async function clearAllPending(uid: string): Promise<void> {
   await batch.commit();
 }
 
+export async function ensureUncategorizedCategory(uid: string): Promise<string> {
+  const catsSnap = await getDocs(fsCollection(db, "users", uid, "categories"));
+  for (const catDoc of catsSnap.docs) {
+    const data = catDoc.data();
+    if (data.name.toLowerCase().trim() === "uncategorized") {
+      return catDoc.id;
+    }
+  }
+  // Create new Uncategorized category
+  const newId = crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+  const catRef = doc(fsCollection(db, "users", uid, "categories"), newId);
+  await setDoc(catRef, { name: "Uncategorized", icon: "📂", orderIndex: 999 });
+  return newId;
+}
+
 export async function addCategoryToFirestore(uid: string, category: Category): Promise<void> {
   const catRef = doc(fsCollection(db, "users", uid, "categories"), category.id);
   await setDoc(catRef, { name: category.name, icon: category.icon, orderIndex: Date.now() });
